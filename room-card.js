@@ -10,7 +10,7 @@
  *   RoomCard      the room tile itself.
  */
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 const HOLD_MS = 500;
 const FAIL_FLASH_MS = 1200;
@@ -58,7 +58,7 @@ const ACTIVE_STATES = new Set([
 
 const TAP_ACTIONS = ["toggle", "more-info", "none"];
 const HOLD_ACTIONS = ["more-info", "none"];
-const BRIGHTNESS_MODES = ["bar", "percent", "none"];
+const BRIGHTNESS_MODES = ["percent", "none"];
 
 const DOMAIN_ICONS = {
   light: "mdi:lightbulb",
@@ -381,8 +381,6 @@ const COLOR_VARS = {
   chip_outline: "--room-card-chip-outline",
   badge: "--room-card-badge-color",
   badge_icon: "--room-card-badge-icon-color",
-  bar: "--room-card-bar-color",
-  bar_background: "--room-card-bar-background",
   ripple: "--room-card-ripple-color",
   focus: "--room-card-focus-color",
   failure: "--room-card-failure-color",
@@ -465,7 +463,7 @@ function validateRoomConfig(config) {
   if (config.main !== undefined && config.main !== null) {
     main = normalizeButton(config.main, "main", MAIN_KEYS, "amber");
     if (!main.entity && !main.icon) throw new Error("main needs an entity, an icon, or both");
-    main.brightness = config.main.brightness || "bar";
+    main.brightness = config.main.brightness || "none";
     if (!BRIGHTNESS_MODES.includes(main.brightness)) {
       throw new Error(`main.brightness must be one of ${BRIGHTNESS_MODES.join(", ")}`);
     }
@@ -631,18 +629,8 @@ const STYLE = `
     40%, 80% { transform: translateX(4px); }
   }
 
-  .bar {
-    position: absolute; left: 0; right: 0; bottom: 0;
-    height: 3px;
-    background: var(--room-card-bar-background,
-                    color-mix(in srgb, var(--secondary-text-color) 15%, transparent));
-    display: none;
-  }
-  .bar.show { display: block; }
-  .bar-fill { height: 100%; width: 0; background: var(--room-card-bar-color, var(--c)); transition: width 250ms ease; }
-
   @media (prefers-reduced-motion: reduce) {
-    .btn, .surface, .bar-fill { transition: none; }
+    .btn, .surface { transition: none; }
     .btn.pressed { transform: none; }
     .btn.pressed .surface { filter: brightness(0.9); }
     .ripple { display: none; }
@@ -720,15 +708,12 @@ class RoomCard extends RoomCardBase {
           <div class="info"><div class="name"></div><div class="temp"></div></div>
           <div class="chips"></div>
         </div>
-        <div class="bar"><div class="bar-fill"></div></div>
       </ha-card>`;
     this._els = {
       tile: root.querySelector(".tile"),
       name: root.querySelector(".name"),
       temp: root.querySelector(".temp"),
       chips: root.querySelector(".chips"),
-      bar: root.querySelector(".bar"),
-      barFill: root.querySelector(".bar-fill"),
     };
     this._els.tile.style.setProperty("--chips", String(Math.max(1, c.chips.length)));
 
@@ -765,13 +750,6 @@ class RoomCard extends RoomCardBase {
 
     if (this._main) this._updateButton(this._main);
     for (const b of this._chips) this._updateButton(b);
-
-    const showBar = pct !== null && c.main.brightness === "bar";
-    this._els.bar.classList.toggle("show", showBar);
-    if (showBar) {
-      this._els.bar.style.setProperty("--c", this._main.el.style.getPropertyValue("--c"));
-      this._els.barFill.style.width = `${pct}%`;
-    }
   }
 
   _formatTemp(s) {

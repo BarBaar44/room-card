@@ -25,16 +25,15 @@ const c = new Card();
 w.document.body.appendChild(c);
 c.addEventListener("hass-more-info", (e) => events.push(e.detail.entityId));
 c.setConfig({ name: "Kamer", temperature: "sensor.t",
-  main: { entity: "light.l", icon: "mdi:sofa" },
+  main: { entity: "light.l", icon: "mdi:sofa", brightness: "percent" },
   chips: [{ entity: "binary_sensor.d", color: "red", tap: "none" }, { entity: "switch.s", color: "blue" }] });
 c.hass = mkHass();
 const R = c.shadowRoot;
 const main = R.querySelector(".main"), chips = R.querySelectorAll(".chip");
 assert.equal(R.querySelector(".name").textContent, "Kamer");
-assert.equal(R.querySelector(".temp").textContent, "21,3 °C");
+assert.equal(R.querySelector(".temp").textContent, "21,3 °C · 50%");
+assert(!R.querySelector(".bar"), "no brightness bar");
 assert(main.classList.contains("on"));
-assert(R.querySelector(".bar").classList.contains("show"));
-assert.equal(R.querySelector(".bar-fill").style.width, "50%");
 assert(!chips[0].classList.contains("clickable"));
 assert.equal(chips[0].querySelector(".surface ha-icon").getAttribute("icon"), "mdi:door-closed");
 
@@ -50,7 +49,7 @@ assert(!main.classList.contains("on"), "still optimistic");
 states = { ...states, "light.l": st("off", { supported_color_modes: ["color_temp"] }, "t1") };
 c.hass = mkHass();
 assert(!main.classList.contains("on"));
-assert(!R.querySelector(".bar").classList.contains("show"));
+assert.equal(R.querySelector(".temp").textContent, "21,3 °C", "no % when off");
 
 // unrelated entity change -> no re-render (spy)
 let n = 0; const orig = c._update.bind(c); c._update = () => { n++; orig(); };
@@ -88,6 +87,7 @@ setTimeout(() => {
     [{ chips: [{}, {}, {}, {}] }, /at most 3/],
     [{ main: { colour: "red", icon: "mdi:x" } }, /unknown option 'colour'/],
     [{ name: "x" }, /at least one/],
+    [{ main: { icon: "mdi:x", brightness: "bar" } }, /brightness must be one of percent, none/],
   ];
   for (const [cfg, re] of bad) assert.throws(() => new Card().setConfig(cfg), re);
   // sport room

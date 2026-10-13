@@ -5,7 +5,7 @@ A fast, lightweight room tile for Home Assistant sections views. One JavaScript 
 ![Room Card in light and dark theme](shot.png)
 
 - **Top left:** room name and temperature (1 decimal, your locale).
-- **Bottom left:** a big round button for the main light. Coloured when on, grey when off. Optional brightness bar or % for dimmable lights.
+- **Bottom left:** a big round button for the main light. Coloured when on, grey when off. Optional brightness % for dimmable lights.
 - **Right:** up to 3 small round chips. Each is a toggle (switch, light, fan, input_boolean, scene, script) or status only (e.g. a door contact).
 - **Instant feedback:** a tap shows the new state right away, then HA confirms it. If the device does not follow within 5 s, or the call fails, the button rolls back with a red ring and a short shake.
 - **Tap** toggles, **hold** (500 ms) opens more-info. Ripple, haptics in the companion app, `prefers-reduced-motion` respected.
@@ -58,7 +58,7 @@ At least one of `temperature`, `main` or `chips` is required. A full example for
 | `color`      | `amber`. A theme name (`red`, `green`, `blue`, `yellow`, ...), any CSS colour, or `auto` (light's own `rgb_color`) |
 | `tap`        | `toggle` for toggle domains, else `none`. Also `more-info`                                |
 | `hold`       | `more-info` when tap is not `none`, else `none`                                           |
-| `brightness` | `main` only: `bar`, `percent` or `none`. Default `bar`, shown for dimmable lights that are on |
+| `brightness` | `main` only: `percent` or `none` (default). `percent` adds the brightness after the temperature for a dimmable light that is on |
 
 Typos in option names show an error card instead of being ignored.
 
@@ -85,8 +85,6 @@ colors:
 | `chip_outline`    | `--room-card-chip-outline`      | `rgba(0,0,0,0.75)`, light mode only      |
 | `badge`           | `--room-card-badge-color`       | `--error-color`                          |
 | `badge_icon`      | `--room-card-badge-icon-color`  | `#fff`                                   |
-| `bar`             | `--room-card-bar-color`         | the main button's `color`                |
-| `bar_background`  | `--room-card-bar-background`    | light tint of the text colour            |
 | `ripple`          | `--room-card-ripple-color`      | the icon colour                          |
 | `focus`           | `--room-card-focus-color`       | `--primary-color`                        |
 | `failure`         | `--room-card-failure-color`     | `--error-color`                          |
