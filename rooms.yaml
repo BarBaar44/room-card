@@ -1,0 +1,85 @@
+# Home view, sections type. Each card defaults to 6 columns x 2 rows,
+# so two tiles sit side by side on a phone.
+type: grid
+cards:
+  - type: custom:room-card
+    name: Living Room
+    temperature: sensor.temperature_living_room_temperature
+    main:
+      entity: light.livingroom_lights
+      icon: mdi:sofa
+      color: amber        # or "auto" to follow the group's colour
+    chips:
+      - entity: binary_sensor.door_sensor_garden_doors_contact
+        icon: mdi:door
+        color: red
+        tap: none
+
+  - type: custom:room-card
+    name: Hallway
+    temperature: sensor.hallway_sensor_temperature
+    main:
+      entity: switch.switch_hallway
+      icon: mdi:coat-rack
+    chips:
+      - entity: binary_sensor.front_door_sensor_contact
+        icon: mdi:door
+        color: red
+        tap: none
+
+  - type: custom:room-card
+    name: Gijs Room
+    temperature: sensor.temperature_room_gijs_temperature
+    main:
+      entity: switch.shelly1_gijs_shelly1_shelly1_gijs
+      icon: mdi:bed
+    chips:
+      - entity: switch.sonoff_gijs_sonoff_gijs
+        icon: mdi:spotlight-beam
+        color: yellow
+
+  - type: custom:room-card
+    name: Master bedroom
+    temperature: sensor.temperature_master_bedroom_temperature
+    main:
+      entity: light.sonoff_ifan_ifan03_masterbedroom_light
+      icon: mdi:bed-king
+    chips:
+      - entity: fan.sonoff_ifan_ifan03_masterbedroom_fan
+        icon: mdi:fan
+        color: green
+
+  - type: custom:room-card
+    name: Bathroom
+    temperature: sensor.temperature_bathroom_temperature
+    main:
+      entity: light.bathroom_light_rl
+      icon: mdi:shower
+    chips:
+      - entity: switch.sonoff_fb_sonoff_fb
+        icon: mdi:fan
+        color: blue
+
+  - type: custom:room-card
+    name: Office
+    temperature: sensor.temperature_office_temperature
+    main:
+      entity: switch.light_studyroom
+      icon: mdi:table-chair
+
+  - type: custom:room-card
+    name: Tim Room
+    temperature: sensor.temperature_room_tim_temperature
+    main:
+      entity: switch.shelly1_tim_shelly1_shelly1_tim
+      icon: mdi:bed
+    chips:
+      - entity: switch.sonoff_tim_sonoff_tim
+        icon: mdi:spotlight-beam
+        color: yellow
+
+  - type: custom:room-card
+    name: Sport Room
+    temperature: sensor.temperature_sports_room_temperature
+    main:
+      icon: mdi:bike-fast   # no entity: static grey icon, not clickable

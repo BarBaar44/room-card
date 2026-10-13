@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tag must match VERSION in room-card.js
+        run: |
+          FILE_VERSION=$(grep -oP 'const VERSION = "\K[^"]+' room-card.js)
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "file: $FILE_VERSION  tag: $TAG_VERSION"
+          test "$FILE_VERSION" = "$TAG_VERSION"
+
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: room-card.js
+          generate_release_notes: true

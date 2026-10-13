@@ -1,0 +1,11 @@
+{
+  "name": "room-card",
+  "private": true,
+  "description": "Development only: tests for room-card.js. The card itself has no dependencies.",
+  "scripts": {
+    "test": "node tests/room-card.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.0"
+  }
+}
