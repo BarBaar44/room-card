@@ -10,7 +10,7 @@
  *   RoomCard      the room tile itself.
  */
 
-const VERSION = "0.1.1";
+const VERSION = "0.2.0";
 
 const HOLD_MS = 500;
 const FAIL_FLASH_MS = 1200;
@@ -655,6 +655,10 @@ class RoomCard extends RoomCardBase {
     if (this._hass) this.hass = this._hass;
   }
 
+  static getConfigElement() {
+    return document.createElement("room-card-editor");
+  }
+
   static getStubConfig(hass) {
     const ids = Object.keys((hass && hass.states) || {});
     const temp = ids.find(
@@ -828,12 +832,233 @@ class RoomCard extends RoomCardBase {
   }
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Visual editor                                                            */
+/* ------------------------------------------------------------------------ */
+
+/*
+ * Built on HA's own <ha-form>, so pickers, theming and layout match the
+ * rest of the UI. Chips are shown as three fixed, collapsible slots.
+ */
+
+const COLOR_OPTIONS = [
+  "amber", "yellow", "orange", "deep-orange", "red", "pink", "purple", "deep-purple",
+  "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green", "lime",
+  "brown", "grey", "blue-grey", "white", "black", "primary", "accent",
+].map((c) => ({ value: c, label: c }));
+
+const colorSelector = (withAuto) => ({
+  select: {
+    mode: "dropdown",
+    custom_value: true, // hex, rgb() and other CSS colours can be typed
+    options: withAuto
+      ? [{ value: "auto", label: "auto (light's own colour)" }, ...COLOR_OPTIONS]
+      : COLOR_OPTIONS,
+  },
+});
+
+const TAP_SELECTOR = {
+  select: {
+    mode: "dropdown",
+    options: [
+      { value: "toggle", label: "Toggle" },
+      { value: "more-info", label: "More info" },
+      { value: "none", label: "Nothing" },
+    ],
+  },
+};
+const HOLD_SELECTOR = {
+  select: {
+    mode: "dropdown",
+    options: [
+      { value: "more-info", label: "More info" },
+      { value: "none", label: "Nothing" },
+    ],
+  },
+};
+
+const MAIN_DOMAINS = ["light", "switch", "fan", "input_boolean", "scene", "script"];
+
+const buttonSchema = (isMain) => [
+  { name: "entity", selector: { entity: isMain ? { filter: { domain: MAIN_DOMAINS } } : {} } },
+  {
+    type: "grid",
+    name: "",
+    schema: [
+      { name: "icon", selector: { icon: {} } },
+      { name: "color", selector: colorSelector(isMain) },
+    ],
+  },
+  {
+    type: "grid",
+    name: "",
+    schema: [
+      { name: "tap", selector: TAP_SELECTOR },
+      { name: "hold", selector: HOLD_SELECTOR },
+    ],
+  },
+  ...(isMain
+    ? [{
+        name: "brightness",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "none", label: "Hidden" },
+              { value: "percent", label: "Percentage after temperature" },
+            ],
+          },
+        },
+      }]
+    : []),
+];
+
+const EDITOR_SCHEMA = [
+  { name: "name", selector: { text: {} } },
+  { name: "temperature", selector: { entity: { filter: { domain: "sensor" } } } },
+  { type: "expandable", name: "main", title: "Main button", icon: "mdi:lightbulb", schema: buttonSchema(true) },
+  ...[1, 2, 3].map((n) => ({
+    type: "expandable",
+    name: `chip_${n}`,
+    title: `Chip ${n}`,
+    icon: "mdi:circle-small",
+    schema: buttonSchema(false),
+  })),
+  {
+    type: "expandable",
+    name: "colors",
+    title: "Colours",
+    icon: "mdi:palette",
+    schema: [{
+      type: "grid",
+      name: "",
+      schema: Object.keys(COLOR_VARS).map((k) => ({ name: k, selector: colorSelector(false) })),
+    }],
+  },
+];
+
+const EDITOR_LABELS = {
+  name: "Room name",
+  temperature: "Temperature sensor",
+  entity: "Entity",
+  icon: "Icon",
+  color: "Colour when on",
+  tap: "Tap action (empty: default)",
+  hold: "Hold action (empty: default)",
+  brightness: "Brightness",
+  icon_off: "Icon off",
+  background_off: "Background off",
+  background_on: "Background on",
+  chip_icon_off: "Chip icon off",
+  chip_background: "Chip background",
+  chip_outline: "Chip outline (light mode)",
+  badge: "Warning badge",
+  badge_icon: "Warning badge icon",
+  card_background: "Card background",
+  card_border: "Card border",
+};
+
+/* Drop empty values so the YAML stays minimal. */
+function compact(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    if (v === undefined || v === null || v === "") continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+class RoomCardEditor extends HTMLElement {
+  /* config -> form data */
+  static toData(config) {
+    const chips = Array.isArray(config.chips) ? config.chips : [];
+    return {
+      name: config.name || "",
+      temperature: config.temperature || "",
+      main: { ...(config.main || {}) },
+      chip_1: { ...(chips[0] || {}) },
+      chip_2: { ...(chips[1] || {}) },
+      chip_3: { ...(chips[2] || {}) },
+      colors: { ...(config.colors || {}) },
+    };
+  }
+
+  /* form data -> config. Keys the editor does not know are kept. */
+  static toConfig(data, previous) {
+    const known = ["name", "temperature", "main", "chips", "colors"];
+    const config = { type: "custom:room-card" };
+    for (const [k, v] of Object.entries(previous || {})) {
+      if (k !== "type" && !known.includes(k)) config[k] = v;
+    }
+    if (data.name) config.name = data.name;
+    if (data.temperature) config.temperature = data.temperature;
+    const main = compact(data.main);
+    if (main.entity || main.icon) config.main = main;
+    const chips = [data.chip_1, data.chip_2, data.chip_3].map(compact).filter((c) => c.entity);
+    if (chips.length) config.chips = chips;
+    const colors = compact(data.colors);
+    if (Object.keys(colors).length) config.colors = colors;
+    return config;
+  }
+
+  setConfig(config) {
+    this._config = config;
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this._form) this._form.hass = hass;
+  }
+
+  connectedCallback() {
+    this._ensureForm().then(() => this._render());
+  }
+
+  /* ha-form is lazy loaded by HA; make sure it exists before using it. */
+  async _ensureForm() {
+    if (customElements.get("ha-form")) return;
+    try {
+      const helpers = await window.loadCardHelpers();
+      const card = await helpers.createCardElement({ type: "entities", entities: [] });
+      if (card.constructor.getConfigElement) await card.constructor.getConfigElement();
+    } catch (_) {
+      /* fall through: the form renders once HA has loaded it */
+    }
+    await customElements.whenDefined("ha-form");
+  }
+
+  _render() {
+    if (!this._config || !customElements.get("ha-form")) return;
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.schema = EDITOR_SCHEMA;
+      this._form.computeLabel = (s) => EDITOR_LABELS[s.name] || s.name.replace(/_/g, " ");
+      this._form.addEventListener("value-changed", (e) => {
+        e.stopPropagation();
+        const config = RoomCardEditor.toConfig(e.detail.value, this._config);
+        this._config = config;
+        this.dispatchEvent(new CustomEvent("config-changed", {
+          detail: { config }, bubbles: true, composed: true,
+        }));
+      });
+      this.appendChild(this._form);
+    }
+    this._form.hass = this._hass;
+    this._form.data = RoomCardEditor.toData(this._config);
+  }
+}
+
 /* ------------------------------------------------------------------------ */
 /* Registration                                                             */
 /* ------------------------------------------------------------------------ */
 
 if (!customElements.get("room-card")) {
   customElements.define("room-card", RoomCard);
+}
+if (!customElements.get("room-card-editor")) {
+  customElements.define("room-card-editor", RoomCardEditor);
 }
 
 window.customCards = window.customCards || [];

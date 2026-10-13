@@ -118,7 +118,51 @@ setTimeout(() => {
     assert(!chips[1].classList.contains("on"), "rolled back after error");
     assert(chips[1].classList.contains("failed"), "failure shown after error");
     assert(/boom/.test(notes[0]), "notification sent");
-    console.log("ALL OK");
-    process.exit(0);
+    editorTests().then(() => {
+      console.log("ALL OK");
+      process.exit(0);
+    }).catch((e) => { console.error(e); process.exit(1); });
   }, 20);
 }, 600);
+
+async function editorTests() {
+  const Editor = w.customElements.get("room-card-editor");
+  assert(Editor, "editor registered");
+  assert.equal(Card.getConfigElement().tagName.toLowerCase(), "room-card-editor");
+
+  const cfg = {
+    type: "custom:room-card", name: "Gijs", temperature: "sensor.t",
+    main: { entity: "switch.s", icon: "mdi:bed" },
+    chips: [{ entity: "binary_sensor.d", color: "red", tap: "none" }],
+    colors: { name: "white" }, grid_options: { rows: 3 },
+  };
+  // round trip keeps everything, including keys the editor does not know
+  assert.deepEqual(Editor.toConfig(Editor.toData(cfg), cfg), cfg);
+  // emptied fields disappear, empty chip slots are skipped, order kept
+  const d = Editor.toData(cfg);
+  d.chip_1 = {}; d.chip_3 = { entity: "switch.s", color: "" };
+  d.main = { entity: "", icon: "" }; d.colors = { name: "" };
+  const out = Editor.toConfig(d, cfg);
+  assert.deepEqual(out, { type: "custom:room-card", grid_options: { rows: 3 }, name: "Gijs",
+    temperature: "sensor.t", chips: [{ entity: "switch.s" }] });
+
+  // with a stub ha-form: renders, and form changes fire config-changed
+  w.customElements.define("ha-form", class extends w.HTMLElement {});
+  const ed = new Editor();
+  const got = [];
+  ed.addEventListener("config-changed", (e) => got.push(e.detail.config));
+  ed.setConfig(cfg);
+  ed.hass = mkHass();
+  w.document.body.appendChild(ed);
+  await new Promise((r) => setTimeout(r, 0));
+  const form = ed.querySelector("ha-form");
+  assert(form, "ha-form rendered");
+  assert.equal(form.data.chip_1.entity, "binary_sensor.d");
+  assert.equal(form.computeLabel({ name: "temperature" }), "Temperature sensor");
+  const nd = { ...form.data, name: "Gijs Room" };
+  form.dispatchEvent(new w.CustomEvent("value-changed", { detail: { value: nd } }));
+  assert.equal(got[0].name, "Gijs Room");
+  assert.equal(got[0].grid_options.rows, 3);
+  // every config the editor produces is accepted by the card
+  new Card().setConfig(got[0]);
+}

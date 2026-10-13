@@ -37,6 +37,8 @@ chips:
     tap: none
 ```
 
+Or add it from the dashboard UI: the card has a visual editor with entity and icon pickers, a collapsible section for the main button, one per chip (up to 3), and one for colours. Colour fields offer the theme names and also accept any typed CSS colour. Options the editor does not show, such as `grid_options`, are kept.
+
 At least one of `temperature`, `main` or `chips` is required. A full example for 8 rooms is in [rooms.yaml](rooms.yaml).
 
 ### Card options
@@ -118,7 +120,7 @@ Default is 6 columns by 2 rows. The main circle is anchored in the bottom left c
 
 ## Roadmap
 
-A `custom:device-button` card in the same file for big device buttons (espresso machine, dishwasher, ...), on the same base: optimistic tap, state read in JS, active border and CSS icon animations. A visual editor later.
+A `custom:device-button` card in the same file for big device buttons (espresso machine, dishwasher, ...), on the same base: optimistic tap, state read in JS, active border and CSS icon animations.
 
 ## Development
 
