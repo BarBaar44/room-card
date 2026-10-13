@@ -37,6 +37,18 @@ assert(main.classList.contains("on"));
 assert(!chips[0].classList.contains("clickable"));
 assert.equal(chips[0].querySelector(".surface ha-icon").getAttribute("icon"), "mdi:door-closed");
 
+// default colours: yellow for main and light chips, amber for others
+assert.equal(main.style.getPropertyValue("--c"), "var(--yellow-color, #ffeb3b)");
+assert.equal(chips[0].style.getPropertyValue("--c"), "var(--red-color, #f44336)");
+{
+  const d = new Card(); w.document.body.appendChild(d);
+  d.setConfig({ chips: [{ entity: "light.l" }, { entity: "switch.s" }] });
+  d.hass = mkHass();
+  const dc = d.shadowRoot.querySelectorAll(".chip");
+  assert.equal(dc[0].style.getPropertyValue("--c"), "var(--yellow-color, #ffeb3b)");
+  assert.equal(dc[1].style.getPropertyValue("--c"), "var(--amber-color, #ffc107)");
+}
+
 // tap via keyboard -> optimistic off
 main.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter" }));
 assert(!main.classList.contains("on"), "optimistic off");

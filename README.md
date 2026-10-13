@@ -57,7 +57,7 @@ At least one of `temperature`, `main` or `chips` is required. A full example for
 | ------------ | ----------------------------------------------------------------------------------------- |
 | `entity`     | none. `main` without entity is a static icon                                              |
 | `icon`       | entity icon, else a domain icon                                                           |
-| `color`      | `amber`. A theme name (`red`, `green`, `blue`, `yellow`, ...), any CSS colour, or `auto` (light's own `rgb_color`) |
+| `color`      | `yellow` for the main button and light chips, `amber` for other chips. A theme name (`red`, `green`, `blue`, `yellow`, ...), any CSS colour, or `auto` (light's own `rgb_color`) |
 | `tap`        | `toggle` for toggle domains, else `none`. Also `more-info`                                |
 | `hold`       | `more-info` when tap is not `none`, else `none`                                           |
 | `brightness` | `main` only: `percent` or `none` (default). `percent` adds the brightness after the temperature for a dimmable light that is on |

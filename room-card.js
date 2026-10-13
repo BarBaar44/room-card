@@ -461,7 +461,7 @@ function validateRoomConfig(config) {
 
   let main = null;
   if (config.main !== undefined && config.main !== null) {
-    main = normalizeButton(config.main, "main", MAIN_KEYS, "amber");
+    main = normalizeButton(config.main, "main", MAIN_KEYS, "yellow");
     if (!main.entity && !main.icon) throw new Error("main needs an entity, an icon, or both");
     main.brightness = config.main.brightness || "none";
     if (!BRIGHTNESS_MODES.includes(main.brightness)) {
@@ -473,7 +473,8 @@ function validateRoomConfig(config) {
   if (!Array.isArray(rawChips)) throw new Error("chips must be a list");
   if (rawChips.length > MAX_CHIPS) throw new Error(`chips: at most ${MAX_CHIPS} chips`);
   const chips = rawChips.map((c, i) => {
-    const chip = normalizeButton(c, `chips[${i}]`, CHIP_KEYS, "amber");
+    const isLight = c && isEntityId(c.entity) && domainOf(c.entity) === "light";
+    const chip = normalizeButton(c, `chips[${i}]`, CHIP_KEYS, isLight ? "yellow" : "amber");
     if (!chip.entity) throw new Error(`chips[${i}].entity is required`);
     return chip;
   });
@@ -800,7 +801,7 @@ class RoomCard extends RoomCardBase {
   _colorFor(cfg, s) {
     if (cfg.color === "auto") {
       const rgb = s && s.attributes.rgb_color;
-      return Array.isArray(rgb) ? `rgb(${rgb.join(",")})` : NAMED_COLORS.amber;
+      return Array.isArray(rgb) ? `rgb(${rgb.join(",")})` : NAMED_COLORS.yellow;
     }
     return resolveColor(cfg.color, "amber");
   }
