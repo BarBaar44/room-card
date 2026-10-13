@@ -131,7 +131,7 @@ npm install
 npm test
 ```
 
-A release is made by bumping `VERSION` in `room-card.js`, committing, and pushing a matching tag (`v0.1.1`). The Release workflow checks the tag against `VERSION`, runs the tests and publishes the GitHub release that HACS picks up.
+A release is made by bumping `VERSION` in `room-card.js`, adding a `## vX.Y.Z` section to [CHANGELOG.md](CHANGELOG.md), committing, and pushing a matching tag. The Release workflow checks the tag against `VERSION`, runs the tests and publishes the GitHub release, with that changelog section as its notes, which HACS picks up.
 
 ## Licence
 

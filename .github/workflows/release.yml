@@ -26,8 +26,18 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm test
 
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v tag="## ${GITHUB_REF_NAME}" '
+            $0 == tag { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "No section '## ${GITHUB_REF_NAME}' in CHANGELOG.md"; exit 1; }
+          cat notes.md
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: room-card.js
-          generate_release_notes: true
+          body_path: notes.md
