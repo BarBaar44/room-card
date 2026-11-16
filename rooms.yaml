@@ -1,85 +1,82 @@
-# Home view, sections type. Each card defaults to 6 columns x 2 rows,
-# so two tiles sit side by side on a phone.
-type: grid
-cards:
-  - type: custom:room-card
-    name: Living Room
-    temperature: sensor.temperature_living_room_temperature
-    main:
-      entity: light.livingroom_lights
-      icon: mdi:sofa
-      color: yellow       # or "auto" to follow the group's colour
-    chips:
-      - entity: binary_sensor.door_sensor_garden_doors_contact
-        icon: mdi:door
-        color: red
-        tap: none
-
-  - type: custom:room-card
-    name: Hallway
-    temperature: sensor.hallway_sensor_temperature
-    main:
-      entity: switch.switch_hallway
-      icon: mdi:coat-rack
-    chips:
-      - entity: binary_sensor.front_door_sensor_contact
-        icon: mdi:door
-        color: red
-        tap: none
-
-  - type: custom:room-card
-    name: Gijs Room
-    temperature: sensor.temperature_room_gijs_temperature
-    main:
-      entity: switch.shelly1_gijs_shelly1_shelly1_gijs
-      icon: mdi:bed
-    chips:
-      - entity: switch.sonoff_gijs_sonoff_gijs
-        icon: mdi:spotlight-beam
-        color: yellow
-
-  - type: custom:room-card
-    name: Master bedroom
-    temperature: sensor.temperature_master_bedroom_temperature
-    main:
-      entity: light.sonoff_ifan_ifan03_masterbedroom_light
-      icon: mdi:bed-king
-    chips:
-      - entity: fan.sonoff_ifan_ifan03_masterbedroom_fan
-        icon: mdi:fan
-        color: green
-
-  - type: custom:room-card
-    name: Bathroom
-    temperature: sensor.temperature_bathroom_temperature
-    main:
-      entity: light.bathroom_light_rl
-      icon: mdi:shower
-    chips:
-      - entity: switch.sonoff_fb_sonoff_fb
-        icon: mdi:fan
-        color: blue
-
-  - type: custom:room-card
-    name: Office
-    temperature: sensor.temperature_office_temperature
-    main:
-      entity: switch.light_studyroom
-      icon: mdi:table-chair
-
-  - type: custom:room-card
+# Every default written out. The card needs none of this: `type: custom:room-card` is enough.
+# Copy only what you want to change; null switches a default off.
+type: custom:room-card
+grid_options:
+  columns: 12
+  rows: 7
+name: Home
+humidity_alert: 70
+dark_below: 10
+entities:
+  dark: sensor.outdoor_sensor_illuminance
+  sun: sun.sun
+  lantern: light.rear_garden
+  kitchen_light: null
+  front_door: binary_sensor.front_door_sensor_contact
+  garden_door: binary_sensor.backdoors_garden
+  kitchen_door: binary_sensor.door_sensor_kitchen_contact
+rooms:
+  tim: # attic, left
     name: Tim Room
+    short_name: Tim
     temperature: sensor.temperature_room_tim_temperature
-    main:
-      entity: switch.shelly1_tim_shelly1_shelly1_tim
-      icon: mdi:bed
-    chips:
-      - entity: switch.sonoff_tim_sonoff_tim
-        icon: mdi:spotlight-beam
-        color: yellow
-
-  - type: custom:room-card
+    humidity: sensor.temperature_room_tim_humidity
+    light: switch.shelly1_tim_shelly1_shelly1_tim
+    climate: climate.virtual_thermostat_room_tim
+    bed_light: switch.sonoff_tim_sonoff_tim
+  sport: # attic, right
     name: Sport Room
+    short_name: Sport
     temperature: sensor.temperature_sports_room_temperature
-    main:
-      icon: mdi:bike-fast   # no entity: static grey icon, not clickable
+    humidity: null
+    light: null
+    climate: null
+  gijs: # first floor, left
+    name: Gijs Room
+    short_name: Gijs
+    temperature: sensor.temperature_room_gijs_temperature
+    humidity: sensor.temperature_room_gijs_humidity
+    light: switch.shelly1_gijs_shelly1_shelly1_gijs
+    climate: climate.virtual_thermostat_room_gijs
+    bed_light: switch.sonoff_gijs_sonoff_gijs
+  office: # first floor
+    name: Office
+    short_name: Office
+    temperature: sensor.temperature_office_temperature
+    humidity: null
+    light: switch.light_studyroom
+    climate: null
+  master: # first floor
+    name: Master bedroom
+    short_name: Master
+    temperature: sensor.temperature_master_bedroom_temperature
+    humidity: sensor.temperature_master_bedroom_humidity
+    light: light.sonoff_ifan_ifan03_masterbedroom_light
+    climate: climate.virtual_thermostat_master_bedroom
+    fan: fan.sonoff_ifan_ifan03_masterbedroom_fan
+    door: binary_sensor.door_sensor_master_bedroom_contact
+  bath: # first floor, right
+    name: Bathroom
+    short_name: Bath
+    temperature: sensor.temperature_bathroom_temperature
+    humidity: sensor.temperature_bathroom_humidity
+    light: light.bathroom_light_rl
+    climate: null
+    fan: switch.sonoff_fb_sonoff_fb
+    shower: null
+  hall: # ground floor, left
+    name: Hallway
+    short_name: Hall
+    temperature: sensor.hallway_sensor_temperature
+    humidity: null
+    light: switch.switch_hallway
+    climate: climate.hallway
+    occupancy: binary_sensor.hallway_sensor_occupancy
+  living: # ground floor
+    name: Living Room
+    short_name: Living
+    temperature: sensor.temperature_living_room_temperature
+    humidity: sensor.temperature_living_room_humidity
+    light: light.livingroom_lights
+    climate: climate.virtual_thermostat_living_room
+    window: binary_sensor.living_room_window

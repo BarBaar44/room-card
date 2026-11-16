@@ -1,180 +1,220 @@
-// Smoke tests for room-card.js in a simulated browser. Run: npm test
+// Tests for room-card.js in a simulated browser. Run: npm test
 const { JSDOM } = require("jsdom");
 const path = require("path");
 const fs = require("fs");
 const assert = require("assert");
+
 const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only", pretendToBeVisual: true });
 const w = dom.window;
 w.eval(fs.readFileSync(path.join(__dirname, "..", "room-card.js"), "utf8"));
 const Card = w.customElements.get("room-card");
-assert(Card, "registered");
+const Editor = w.customElements.get("room-card-editor");
+assert(Card, "card registered");
+assert(Editor, "editor registered");
 
-const st = (state, attrs = {}, lc = "t0") => ({ state, attributes: attrs, last_changed: lc });
-let states = {
-  "sensor.t": st("21.345", { unit_of_measurement: "°C", friendly_name: "T" }),
-  "light.l": st("on", { brightness: 128, supported_color_modes: ["color_temp"], rgb_color: [255, 200, 100] }),
-  "binary_sensor.d": st("off", { device_class: "door" }),
-  "switch.s": st("off"),
-};
+let tick = 0;
+const st = (state, attributes = {}) => ({ state, attributes, last_changed: `t${tick++}` });
+const night = () => ({
+  "sensor.outdoor_sensor_illuminance": st("2"),
+  "sun.sun": st("below_horizon"),
+  "light.rear_garden": st("on"),
+  "binary_sensor.front_door_sensor_contact": st("off"),
+  "binary_sensor.backdoors_garden": st("off"),
+  "binary_sensor.door_sensor_kitchen_contact": st("off"),
+  "sensor.temperature_room_tim_temperature": st("19.84"),
+  "switch.shelly1_tim_shelly1_shelly1_tim": st("off"),
+  "switch.sonoff_tim_sonoff_tim": st("off"),
+  "sensor.temperature_room_gijs_temperature": st("20.2"),
+  "switch.shelly1_gijs_shelly1_shelly1_gijs": st("off"),
+  "switch.sonoff_gijs_sonoff_gijs": st("on"),
+  "switch.light_studyroom": st("on"),
+  "light.sonoff_ifan_ifan03_masterbedroom_light": st("off"),
+  "fan.sonoff_ifan_ifan03_masterbedroom_fan": st("off"),
+  "sensor.temperature_bathroom_temperature": st("22.1"),
+  "sensor.temperature_bathroom_humidity": st("78"),
+  "light.bathroom_light_rl": st("on"),
+  "switch.sonoff_fb_sonoff_fb": st("on"),
+  "switch.switch_hallway": st("off"),
+  "sensor.temperature_living_room_temperature": st("21.3"),
+  "light.livingroom_lights": st("on"),
+  "climate.virtual_thermostat_living_room": st("heat", { hvac_action: "heating", temperature: 21.5 }),
+});
+
+let states = night();
 const calls = [];
-const events = [];
-const mkHass = () => ({ states, language: "nl", locale: { language: "nl" },
-  callService: (d, s, data) => { calls.push([d, s, data.entity_id]); return Promise.resolve(); } });
+let failNext = false;
+const mkHass = () => ({
+  states, language: "nl", locale: { language: "nl" },
+  callService: (d, s, data) => {
+    calls.push([d, s, data.entity_id]);
+    if (failNext) { failNext = false; return Promise.reject(new Error("boom")); }
+    return Promise.resolve();
+  },
+});
+const flush = () => new Promise((r) => setTimeout(r, 0));
+const key = (el, k, shift = false) => el.dispatchEvent(new w.KeyboardEvent("keydown", { key: k, shiftKey: shift, bubbles: true }));
 
-const c = new Card();
-w.document.body.appendChild(c);
-c.addEventListener("hass-more-info", (e) => events.push(e.detail.entityId));
-c.setConfig({ name: "Kamer", temperature: "sensor.t",
-  main: { entity: "light.l", icon: "mdi:sofa", brightness: "percent" },
-  chips: [{ entity: "binary_sensor.d", color: "red", tap: "none" }, { entity: "switch.s", color: "blue" }] });
-c.hass = mkHass();
-const R = c.shadowRoot;
-const main = R.querySelector(".main"), chips = R.querySelectorAll(".chip");
-assert.equal(R.querySelector(".name").textContent, "Kamer");
-assert.equal(R.querySelector(".temp").textContent, "21,3 °C · 50%");
-assert(!R.querySelector(".bar"), "no brightness bar");
-assert(main.classList.contains("on"));
-assert(!chips[0].classList.contains("clickable"));
-assert.equal(chips[0].querySelector(".surface ha-icon").getAttribute("icon"), "mdi:door-closed");
-
-// default colours: yellow for main and light chips, amber for others
-assert.equal(main.style.getPropertyValue("--c"), "var(--yellow-color, #ffeb3b)");
-assert.equal(chips[0].style.getPropertyValue("--c"), "var(--red-color, #f44336)");
-{
-  const d = new Card(); w.document.body.appendChild(d);
-  d.setConfig({ chips: [{ entity: "light.l" }, { entity: "switch.s" }] });
-  d.hass = mkHass();
-  const dc = d.shadowRoot.querySelectorAll(".chip");
-  assert.equal(dc[0].style.getPropertyValue("--c"), "var(--yellow-color, #ffeb3b)");
-  assert.equal(dc[1].style.getPropertyValue("--c"), "var(--amber-color, #ffc107)");
-}
-
-// tap via keyboard -> optimistic off
-main.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter" }));
-assert(!main.classList.contains("on"), "optimistic off");
-assert.deepEqual(calls.pop(), ["homeassistant", "turn_off", "light.l"]);
-// attribute-only update keeps optimistic
-states = { ...states, "light.l": { ...states["light.l"], attributes: { ...states["light.l"].attributes, brightness: 130 } } };
-c.hass = mkHass();
-assert(!main.classList.contains("on"), "still optimistic");
-// confirm
-states = { ...states, "light.l": st("off", { supported_color_modes: ["color_temp"] }, "t1") };
-c.hass = mkHass();
-assert(!main.classList.contains("on"));
-assert.equal(R.querySelector(".temp").textContent, "21,3 °C", "no % when off");
-
-// unrelated entity change -> no re-render (spy)
-let n = 0; const orig = c._update.bind(c); c._update = () => { n++; orig(); };
-states = { ...states, "sensor.other": st("1") }; c.hass = mkHass();
-assert.equal(n, 0, "no rerender for foreign entity");
-
-// unavailable chip
-states = { ...states, "switch.s": st("unavailable") }; c.hass = mkHass();
-assert(chips[1].classList.contains("unavail"));
-chips[1].dispatchEvent(new w.KeyboardEvent("keydown", { key: " " }));
-assert.equal(calls.length, 0, "no call when unavailable");
-
-// rollback timer via fake: set optimistic then ensure timer clears
-states = { ...states, "switch.s": st("off") }; c.hass = mkHass();
-chips[1].dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter" }));
-assert(chips[1].classList.contains("on"));
-assert.deepEqual(calls.pop(), ["homeassistant", "turn_on", "switch.s"]);
-// HA reports a different state than requested -> rollback + failed flash
-states = { ...states, "switch.s": st("unavailable", {}, "t2") }; c.hass = mkHass();
-assert(!chips[1].classList.contains("on"), "rolled back");
-assert(chips[1].classList.contains("failed"), "failure shown");
-assert.equal(c._optimistic.size, 0);
-
-// hold -> more-info (pointer events)
-const PE = w.PointerEvent || w.MouseEvent;
-main.dispatchEvent(new PE("pointerdown", { button: 0, clientX: 5, clientY: 5 }));
-setTimeout(() => {
-  main.dispatchEvent(new PE("pointerup", { button: 0 }));
-  assert.deepEqual(events, ["light.l"], "hold opened more-info");
-  assert.equal(calls.length, 0, "hold did not toggle");
-
-  // validation
-  const bad = [
-    [{ main: { entity: "binary_sensor.d", tap: "toggle" } }, /toggle is not possible/],
-    [{ chips: [{}, {}, {}, {}] }, /at most 3/],
-    [{ main: { colour: "red", icon: "mdi:x" } }, /unknown option 'colour'/],
-    [{ name: "x" }, /at least one/],
-    [{ main: { icon: "mdi:x", brightness: "bar" } }, /brightness must be one of percent, none/],
-  ];
-  for (const [cfg, re] of bad) assert.throws(() => new Card().setConfig(cfg), re);
-  // sport room
-  const sp = new Card(); w.document.body.appendChild(sp);
-  sp.setConfig({ name: "Sport", temperature: "sensor.t", main: { icon: "mdi:bike-fast" } });
-  sp.hass = mkHass();
-  assert(!sp.shadowRoot.querySelector(".main").classList.contains("clickable"));
-  assert(!sp.shadowRoot.querySelector(".chips"));
-  assert(Card.getStubConfig(mkHass()).main.entity === "light.l");
-  const cc = new Card(); w.document.body.appendChild(cc);
-  cc.setConfig({ temperature: "sensor.t", colors: { name: "white", icon_off: "#555", card_background: "rgb(1,2,3)" } });
-  assert.equal(cc.style.getPropertyValue("--room-card-name-color"), "var(--white-color, #ffffff)");
-  assert.equal(cc.style.getPropertyValue("--room-card-off-color"), "#555");
-  assert.equal(cc.style.getPropertyValue("--ha-card-background"), "rgb(1,2,3)");
-  cc.setConfig({ temperature: "sensor.t" });
-  assert.equal(cc.style.getPropertyValue("--room-card-off-color"), "", "cleared on reconfig");
-  assert.throws(() => new Card().setConfig({ temperature: "sensor.t", colors: { nmae: "red" } }), /unknown option 'nmae'/);
-  // service call rejected -> rollback + failed flash
-  states = { ...states, "switch.s": st("off", {}, "t3") };
-  const failing = { ...mkHass(), callService: () => Promise.reject(new Error("boom")) };
+(async () => {
+  const c = new Card();
+  w.document.body.appendChild(c);
+  const moreInfo = [];
   const notes = [];
+  c.addEventListener("hass-more-info", (e) => moreInfo.push(e.detail.entityId));
   c.addEventListener("hass-notification", (e) => notes.push(e.detail.message));
-  c.hass = failing;
-  chips[1].classList.remove("failed");
-  chips[1].dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter" }));
-  assert(chips[1].classList.contains("on"), "optimistic on");
-  setTimeout(() => {
-    assert(!chips[1].classList.contains("on"), "rolled back after error");
-    assert(chips[1].classList.contains("failed"), "failure shown after error");
-    assert(/boom/.test(notes[0]), "notification sent");
-    editorTests().then(() => {
-      console.log("ALL OK");
-      process.exit(0);
-    }).catch((e) => { console.error(e); process.exit(1); });
-  }, 20);
-}, 600);
+  c.setConfig({});
+  c.hass = mkHass();
+  const R = c.shadowRoot;
+  const q = (s) => R.querySelector(s);
+  const act = (a) => R.querySelector(`[data-act="${a}"]`);
 
-async function editorTests() {
-  const Editor = w.customElements.get("room-card-editor");
-  assert(Editor, "editor registered");
-  assert.equal(Card.getConfigElement().tagName.toLowerCase(), "room-card-editor");
+  // header
+  assert.equal(q(".name").textContent, "Home");
+  assert.equal(q(".big").textContent, "4lights on", "living, office, bath, Gijs bed light");
+  assert.equal(q(".line").textContent, "Bath 78 %, fan on · Living heating to 21,5°");
+  assert(!q(".alloff").disabled);
 
-  const cfg = {
-    type: "custom:room-card", name: "Gijs", temperature: "sensor.t",
-    main: { entity: "switch.s", icon: "mdi:bed" },
-    chips: [{ entity: "binary_sensor.d", color: "red", tap: "none" }],
-    colors: { name: "white" }, grid_options: { rows: 3 },
-  };
-  // round trip keeps everything, including keys the editor does not know
-  assert.deepEqual(Editor.toConfig(Editor.toData(cfg), cfg), cfg);
-  // emptied fields disappear, empty chip slots are skipped, order kept
-  const d = Editor.toData(cfg);
-  d.chip_1 = {}; d.chip_3 = { entity: "switch.s", color: "" };
-  d.main = { entity: "", icon: "" }; d.colors = { name: "" };
-  const out = Editor.toConfig(d, cfg);
-  assert.deepEqual(out, { type: "custom:room-card", grid_options: { rows: 3 }, name: "Gijs",
-    temperature: "sensor.t", chips: [{ entity: "switch.s" }] });
+  // drawing: labels, temperatures in the locale, lit and dark rooms
+  const svg = q(".pic svg");
+  assert(svg, "drawing rendered");
+  assert(svg.textContent.includes("Tim") && svg.textContent.includes("19,8°"), "short name and temperature");
+  assert(svg.textContent.includes("78 %"), "bathroom humidity shown above the alert level");
+  const fillOf = (a) => act(a).querySelector("rect, polygon").getAttribute("fill");
+  assert(/-lit\)$/.test(fillOf("living")), "lit room glows");
+  assert.equal(fillOf("hall"), "#1a1a1a", "dark room is black glass at night");
+  assert(act("kitchen").classList.contains("na"), "kitchen without a light entity is not interactive");
 
-  // with a stub ha-form: renders, and form changes fire config-changed
-  w.customElements.define("ha-form", class extends w.HTMLElement {});
-  const ed = new Editor();
-  const got = [];
-  ed.addEventListener("config-changed", (e) => got.push(e.detail.config));
-  ed.setConfig(cfg);
-  ed.hass = mkHass();
-  w.document.body.appendChild(ed);
-  await new Promise((r) => setTimeout(r, 0));
-  const form = ed.querySelector("ha-form");
-  assert(form, "ha-form rendered");
-  assert.equal(form.data.chip_1.entity, "binary_sensor.d");
-  assert.equal(form.computeLabel({ name: "temperature" }), "Temperature sensor");
-  const nd = { ...form.data, name: "Gijs Room" };
-  form.dispatchEvent(new w.CustomEvent("value-changed", { detail: { value: nd } }));
-  assert.equal(got[0].name, "Gijs Room");
-  assert.equal(got[0].grid_options.rows, 3);
-  // every config the editor produces is accepted by the card
-  new Card().setConfig(got[0]);
-}
+  // day: dark rooms turn silver
+  states = { ...states, "sensor.outdoor_sensor_illuminance": st("800") };
+  c.hass = mkHass();
+  assert(/-day\)$/.test(fillOf("hall")), "silver by day");
+  // dark sensor unavailable: falls back to the sun
+  states = { ...states, "sensor.outdoor_sensor_illuminance": st("unavailable") };
+  c.hass = mkHass();
+  assert.equal(fillOf("hall"), "#1a1a1a", "sun below the horizon counts as dark");
+
+  // tap a room: optimistic, explicit turn_off
+  key(act("living"), "Enter");
+  assert.deepEqual(calls.pop(), ["homeassistant", "turn_off", "light.livingroom_lights"]);
+  assert.equal(fillOf("living"), "#1a1a1a", "optimistic off");
+  assert.equal(q(".big").textContent, "3lights on");
+  // attribute-only update keeps the optimistic state
+  states = { ...states, "light.livingroom_lights": { ...states["light.livingroom_lights"], attributes: { brightness: 3 } } };
+  c.hass = mkHass();
+  assert.equal(fillOf("living"), "#1a1a1a", "still optimistic");
+  // confirm
+  states = { ...states, "light.livingroom_lights": st("off") };
+  c.hass = mkHass();
+  assert.equal(fillOf("living"), "#1a1a1a");
+
+  // tap a room whose light changes to something else: rollback and failure flash
+  key(act("office"), "Enter");
+  assert.deepEqual(calls.pop(), ["homeassistant", "turn_off", "switch.light_studyroom"]);
+  states = { ...states, "switch.light_studyroom": st("unavailable") };
+  c.hass = mkHass();
+  assert(act("office").classList.contains("failed"), "failure flash");
+  assert(act("office").classList.contains("unavail"), "unavailable light dims the room");
+  assert.equal(q(".name").textContent, "Office light unavailable");
+  assert(q(".name").classList.contains("notice"));
+  key(act("office"), "Enter");
+  assert.equal(calls.length, 0, "no call for an unavailable light");
+  states = { ...states, "switch.light_studyroom": st("on") };
+  c.hass = mkHass();
+
+  // service call fails: rollback and a notification
+  failNext = true;
+  key(act("hall"), "Enter");
+  assert.deepEqual(calls.pop(), ["homeassistant", "turn_on", "switch.switch_hallway"]);
+  await flush();
+  assert.equal(fillOf("hall"), "#1a1a1a", "rolled back");
+  assert(notes.length === 1 && notes[0].includes("boom"));
+
+  // fans and bed lights
+  key(act("masterFan"), "Enter");
+  assert.deepEqual(calls.pop(), ["homeassistant", "turn_on", "fan.sonoff_ifan_ifan03_masterbedroom_fan"]);
+  assert(act("masterFan").querySelector(".spin"), "fan spins at once");
+  key(act("gijsSpot"), "Enter");
+  assert.deepEqual(calls.pop(), ["homeassistant", "turn_off", "switch.sonoff_gijs_sonoff_gijs"]);
+  key(act("kitchen"), "Enter");
+  assert.equal(calls.length, 0, "nothing configured, nothing called");
+  // hold on a device: more-info
+  key(act("lantern"), "Enter", true);
+  assert.deepEqual(moreInfo.splice(0), ["light.rear_garden"]);
+
+  // unrelated entity: no re-render
+  let n = 0; const orig = c._update.bind(c); c._update = () => { n++; orig(); };
+  states = { ...states, "sensor.unrelated": st("1") };
+  c.hass = mkHass();
+  assert.equal(n, 0, "no re-render for a foreign entity");
+  c._update = orig;
+
+  // warnings: doors first, in the warning colour
+  states = { ...states, "binary_sensor.front_door_sensor_contact": st("on"), "binary_sensor.backdoors_garden": st("on") };
+  c.hass = mkHass();
+  assert.equal(q(".name").textContent, "Front door open +1");
+  assert(q(".name").classList.contains("warn"));
+
+  // hold a room: details pop-up; rows open more-info
+  key(act("bath"), "Enter", true);
+  const dlg = q("dialog");
+  assert(dlg.open || dlg.hasAttribute("open"), "details open");
+  assert.equal(q(".dh .t").textContent, "Bathroom");
+  const rows = [...R.querySelectorAll(".row")].map((r) => r.firstChild.textContent);
+  assert.deepEqual(rows, ["Temperature", "Humidity", "Light", "Fan"]);
+  R.querySelectorAll(".row")[1].dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  assert.deepEqual(moreInfo.splice(0), ["sensor.temperature_bathroom_humidity"]);
+  q(".dh .x").click();
+  assert(!(dlg.open || dlg.hasAttribute("open")), "details closed");
+  // a room without a light opens details on tap
+  key(act("sport"), "Enter");
+  assert.equal(q(".dh .t").textContent, "Sport Room");
+  q(".dh .x").click();
+
+  // All off: one call with every lit room light and bed light
+  calls.length = 0;
+  q(".alloff").click();
+  const [d, s, ids] = calls.pop();
+  assert.equal(`${d}.${s}`, "homeassistant.turn_off");
+  assert.deepEqual([...ids].sort(), ["light.bathroom_light_rl", "switch.light_studyroom"]);
+  assert.equal(q(".big").textContent, "All off");
+  assert(q(".alloff").disabled);
+
+  // config: overrides, nulls, errors
+  {
+    const d2 = new Card(); w.document.body.appendChild(d2);
+    d2.setConfig({ name: "Thuis", rooms: { tim: { short_name: "T", light: null }, living: { name: "Woonkamer" } }, entities: { dark: "binary_sensor.donker" } });
+    states = { ...states, "binary_sensor.donker": st("off") };
+    d2.hass = mkHass();
+    const r2 = d2.shadowRoot;
+    assert(r2.querySelector(".pic svg").textContent.includes("Woonkamer"), "name used when no short name");
+    key(r2.querySelector('[data-act="tim"]'), "Enter");
+    assert.equal(r2.querySelector(".dh .t").textContent, "Tim Room", "no light: tap opens details");
+    assert(/-day\)$/.test(r2.querySelector('[data-act="hall"] rect').getAttribute("fill")), "binary dark sensor off: day");
+  }
+  const bad = (cfg, re) => assert.throws(() => new Card().setConfig(cfg), re);
+  bad({ temperature: "sensor.t" }, /v0\.2 options/);
+  bad({ rooms: { attic: {} } }, /unknown option 'attic'/);
+  bad({ rooms: { tim: { fan: "fan.x" } } }, /unknown option 'fan'/);
+  bad({ rooms: { tim: { light: "sensor.x" } } }, /cannot be switched/);
+  bad({ entities: { lantern: "not an id" } }, /not a valid entity id/);
+  bad({ humidity_alert: "lots" }, /must be a number/);
+
+  // editor: shows defaults, writes only differences, keeps unknown keys
+  const data = Editor.toData({});
+  assert.equal(data.room_bath.light, "light.bathroom_light_rl");
+  assert.equal(data.entities.kitchen_light, "");
+  assert.deepEqual(Editor.toConfig(data, { type: "custom:room-card", grid_options: { rows: 7 } }), { type: "custom:room-card", grid_options: { rows: 7 } });
+  data.room_bath.shower = "binary_sensor.shower";
+  data.room_tim.bed_light = "";
+  data.entities.kitchen_light = "light.kitchen";
+  data.humidity_alert = 75;
+  assert.deepEqual(Editor.toConfig(data, {}), {
+    type: "custom:room-card", humidity_alert: 75, entities: { kitchen_light: "light.kitchen" },
+    rooms: { tim: { bed_light: null }, bath: { shower: "binary_sensor.shower" } },
+  });
+  const round = Editor.toData(Editor.toConfig(data, {}));
+  assert.equal(round.room_tim.bed_light, "", "cleared default stays cleared");
+  assert.equal(round.room_bath.shower, "binary_sensor.shower");
+
+  console.log("room-card tests passed");
+  process.exit(0);
+})().catch((e) => { console.error(e); process.exit(1); });

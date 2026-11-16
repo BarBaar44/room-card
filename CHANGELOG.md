@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.0
+
+### New
+* **The whole house in one card.** A cut-away line drawing of the house in the style of the Tesla Model 3 and Gardenview House cards replaces the eight room tiles: attic (Tim, Sport Room) with a dakkapel on both sides, first floor (Gijs, Office, Master bedroom, Bathroom), ground floor (Hallway, Living Room with the open kitchen), and the garden facade from the sun screen card on the right.
+* Every room shows its short name and temperature. A lit room glows amber; a dark room is black glass at night and silver by day (`dark` entity below `dark_below`, else the sun).
+* Fans spin, bed lights turn yellow, the shower runs, steam and the humidity show in the bathroom at or above `humidity_alert`, the living room radiator glows while heating, the kitchen follows day, night and its own light, and the garden side windows glow with the rooms behind them.
+* Name row with warnings (doors and window open in red, unavailable lights in amber), the number of lights on as the big number, and a short status line.
+* All off button: one call for every room light and bed light that is on.
+* Hold a room for a details pop-up (climate, controls, doors and sensors); rows open more-info.
+* Visual editor for every entity and threshold. It shows the defaults and only writes what differs; a cleared default becomes `null`.
+* Keyboard: Tab to a room or device, Enter or Space taps, Shift+Enter holds.
+
+### Kept
+* Tap toggles with an explicit turn_on or turn_off, instant feedback, rollback after 5 s or when HA reports another state, a failure flash and vibration, and a notification when the call fails. Moving more than 10 px cancels a tap or hold.
+* Re-renders only when one of its own entities changes.
+
+### Breaking
+* The room tile is gone. `temperature`, `main` and `chips` give an error: replace the eight tiles with one `type: custom:room-card` card. Defaults are 12 columns by 7 rows.
+* `colors` now only has `warn` and `notice`.
+
 ## v0.2.0
 
 ### New
