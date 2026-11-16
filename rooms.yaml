@@ -1,5 +1,5 @@
-# Every default written out. The card needs none of this: `type: custom:room-card` is enough.
-# Copy only what you want to change; null switches a default off.
+# Example with made-up entity ids. Every role defaults to null (not shown);
+# `type: custom:room-card` alone renders the house with neutral names.
 type: custom:room-card
 grid_options:
   columns: 12
@@ -8,75 +8,65 @@ name: Home
 humidity_alert: 70
 dark_below: 10
 entities:
-  dark: sensor.outdoor_sensor_illuminance
+  dark: sensor.outdoor_illuminance # or a binary_sensor (on = dark); null: the sun
   sun: sun.sun
-  lantern: light.rear_garden
-  kitchen_light: null
-  front_door: binary_sensor.front_door_sensor_contact
-  garden_door: binary_sensor.backdoors_garden
-  kitchen_door: binary_sensor.door_sensor_kitchen_contact
+  lantern: light.garden_lantern
+  kitchen_light: light.kitchen
+  front_door: binary_sensor.front_door
+  garden_door: binary_sensor.garden_doors
+  kitchen_door: binary_sensor.kitchen_door
 rooms:
-  tim: # attic, left
-    name: Tim Room
-    short_name: Tim
-    temperature: sensor.temperature_room_tim_temperature
-    humidity: sensor.temperature_room_tim_humidity
-    light: switch.shelly1_tim_shelly1_shelly1_tim
-    climate: climate.virtual_thermostat_room_tim
-    bed_light: switch.sonoff_tim_sonoff_tim
-  sport: # attic, right
-    name: Sport Room
-    short_name: Sport
-    temperature: sensor.temperature_sports_room_temperature
-    humidity: null
-    light: null
-    climate: null
-  gijs: # first floor, left
-    name: Gijs Room
-    short_name: Gijs
-    temperature: sensor.temperature_room_gijs_temperature
-    humidity: sensor.temperature_room_gijs_humidity
-    light: switch.shelly1_gijs_shelly1_shelly1_gijs
-    climate: climate.virtual_thermostat_room_gijs
-    bed_light: switch.sonoff_gijs_sonoff_gijs
-  office: # first floor
+  attic_left: # attic, left: bed under the dakkapel, bed light
+    name: Attic bedroom
+    short_name: Attic
+    temperature: sensor.attic_bedroom_temperature
+    humidity: sensor.attic_bedroom_humidity
+    light: switch.attic_bedroom_light
+    climate: climate.attic_bedroom
+    bed_light: switch.attic_bedroom_bed_light
+  attic_right: # attic, right: bike
+    name: Gym
+    temperature: sensor.gym_temperature
+  first_1: # first floor, left: bed, bed light
+    name: Bedroom 1
+    temperature: sensor.bedroom_1_temperature
+    humidity: sensor.bedroom_1_humidity
+    light: switch.bedroom_1_light
+    climate: climate.bedroom_1
+    bed_light: switch.bedroom_1_bed_light
+  first_2: # first floor, second: desk
     name: Office
-    short_name: Office
-    temperature: sensor.temperature_office_temperature
-    humidity: null
-    light: switch.light_studyroom
-    climate: null
-  master: # first floor
-    name: Master bedroom
-    short_name: Master
-    temperature: sensor.temperature_master_bedroom_temperature
-    humidity: sensor.temperature_master_bedroom_humidity
-    light: light.sonoff_ifan_ifan03_masterbedroom_light
-    climate: climate.virtual_thermostat_master_bedroom
-    fan: fan.sonoff_ifan_ifan03_masterbedroom_fan
-    door: binary_sensor.door_sensor_master_bedroom_contact
-  bath: # first floor, right
+    temperature: sensor.office_temperature
+    light: switch.office_light
+  first_3: # first floor, third: king bed, ceiling fan
+    name: Main bedroom
+    short_name: Bedroom
+    temperature: sensor.main_bedroom_temperature
+    humidity: sensor.main_bedroom_humidity
+    light: light.main_bedroom
+    climate: climate.main_bedroom
+    fan: fan.main_bedroom
+    door: binary_sensor.main_bedroom_door
+  first_4: # first floor, right: shower, ceiling extractor
     name: Bathroom
     short_name: Bath
-    temperature: sensor.temperature_bathroom_temperature
-    humidity: sensor.temperature_bathroom_humidity
-    light: light.bathroom_light_rl
-    climate: null
-    fan: switch.sonoff_fb_sonoff_fb
-    shower: null
-  hall: # ground floor, left
+    temperature: sensor.bathroom_temperature
+    humidity: sensor.bathroom_humidity
+    light: light.bathroom
+    fan: switch.bathroom_fan
+    shower: binary_sensor.shower
+  ground_left: # ground floor, left: hallway with the stairs
     name: Hallway
     short_name: Hall
-    temperature: sensor.hallway_sensor_temperature
-    humidity: null
-    light: switch.switch_hallway
+    temperature: sensor.hallway_temperature
+    light: switch.hallway_light
     climate: climate.hallway
-    occupancy: binary_sensor.hallway_sensor_occupancy
-  living: # ground floor
-    name: Living Room
+    occupancy: binary_sensor.hallway_motion
+  ground_right: # ground floor, right: living room, radiator, open kitchen
+    name: Living room
     short_name: Living
-    temperature: sensor.temperature_living_room_temperature
-    humidity: sensor.temperature_living_room_humidity
-    light: light.livingroom_lights
-    climate: climate.virtual_thermostat_living_room
-    window: binary_sensor.living_room_window
+    temperature: sensor.living_room_temperature
+    humidity: sensor.living_room_humidity
+    light: light.living_room
+    climate: climate.living_room
+    window: binary_sensor.window_living_room
