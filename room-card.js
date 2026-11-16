@@ -19,7 +19,7 @@
 // Everything sits in one block so the top-level names cannot clash with the
 // sister cards when the files are loaded as classic scripts.
 {
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
 
 const RC_HOLD_MS = 500;
 const RC_MOVE_PX = 10;
@@ -27,19 +27,19 @@ const RC_ROLLBACK_MS = 5000;
 const RC_FAIL_MS = 1200;
 
 /* The rooms are fixed places in the drawing (the owner's house). */
-const RC_SLOTS = ["tim", "sport", "gijs", "office", "master", "bath", "hall", "living"];
-const RC_FLOORS = { tim: "Attic", sport: "Attic", gijs: "First floor", office: "First floor", master: "First floor", bath: "First floor", hall: "Ground floor", living: "Ground floor" };
+const RC_SLOTS = ["attic_left", "attic_right", "first_1", "first_2", "first_3", "first_4", "ground_left", "ground_right"];
+const RC_FLOORS = { attic_left: "Attic", attic_right: "Attic", first_1: "First floor", first_2: "First floor", first_3: "First floor", first_4: "First floor", ground_left: "Ground floor", ground_right: "Ground floor" };
 
 /* Per room: which extra roles the drawing has a place for. */
 const RC_ROOM_ROLES = {
-  tim: ["bed_light"],
-  sport: [],
-  gijs: ["bed_light"],
-  office: [],
-  master: ["fan", "door"],
-  bath: ["fan", "shower"],
-  hall: ["occupancy"],
-  living: ["window"],
+  attic_left: ["bed_light"],
+  attic_right: [],
+  first_1: ["bed_light"],
+  first_2: [],
+  first_3: ["fan", "door"],
+  first_4: ["fan", "shower"],
+  ground_left: ["occupancy"],
+  ground_right: ["window"],
 };
 const RC_COMMON_ROLES = ["temperature", "humidity", "light", "climate"];
 const RC_ROOM_TEXT = ["name", "short_name"];
@@ -49,23 +49,24 @@ const RC_DEFAULTS = {
   humidity_alert: 70, // % humidity in the bathroom: steam and a line in the status
   dark_below: 10, // lx, only when `dark` is an illuminance sensor
   entities: {
-    dark: "sensor.outdoor_sensor_illuminance", // binary_sensor / input_boolean (on = dark) or an illuminance sensor; null: the sun
+    dark: null, // binary_sensor / input_boolean (on = dark) or an illuminance sensor; null: the sun
     sun: "sun.sun",
-    lantern: "light.rear_garden",
+    lantern: null,
     kitchen_light: null, // null: the kitchen is lit by day and dark at night
-    front_door: "binary_sensor.front_door_sensor_contact",
-    garden_door: "binary_sensor.backdoors_garden",
-    kitchen_door: "binary_sensor.door_sensor_kitchen_contact",
+    front_door: null,
+    garden_door: null,
+    kitchen_door: null,
   },
+  /* Every role defaults to null (not shown). Names describe the place in the drawing. */
   rooms: {
-    tim: { name: "Tim Room", short_name: "Tim", temperature: "sensor.temperature_room_tim_temperature", humidity: "sensor.temperature_room_tim_humidity", light: "switch.shelly1_tim_shelly1_shelly1_tim", climate: "climate.virtual_thermostat_room_tim", bed_light: "switch.sonoff_tim_sonoff_tim" },
-    sport: { name: "Sport Room", short_name: "Sport", temperature: "sensor.temperature_sports_room_temperature", humidity: null, light: null, climate: null },
-    gijs: { name: "Gijs Room", short_name: "Gijs", temperature: "sensor.temperature_room_gijs_temperature", humidity: "sensor.temperature_room_gijs_humidity", light: "switch.shelly1_gijs_shelly1_shelly1_gijs", climate: "climate.virtual_thermostat_room_gijs", bed_light: "switch.sonoff_gijs_sonoff_gijs" },
-    office: { name: "Office", short_name: "Office", temperature: "sensor.temperature_office_temperature", humidity: null, light: "switch.light_studyroom", climate: null },
-    master: { name: "Master bedroom", short_name: "Master", temperature: "sensor.temperature_master_bedroom_temperature", humidity: "sensor.temperature_master_bedroom_humidity", light: "light.sonoff_ifan_ifan03_masterbedroom_light", climate: "climate.virtual_thermostat_master_bedroom", fan: "fan.sonoff_ifan_ifan03_masterbedroom_fan", door: "binary_sensor.door_sensor_master_bedroom_contact" },
-    bath: { name: "Bathroom", short_name: "Bath", temperature: "sensor.temperature_bathroom_temperature", humidity: "sensor.temperature_bathroom_humidity", light: "light.bathroom_light_rl", climate: null, fan: "switch.sonoff_fb_sonoff_fb", shower: null },
-    hall: { name: "Hallway", short_name: "Hall", temperature: "sensor.hallway_sensor_temperature", humidity: null, light: "switch.switch_hallway", climate: "climate.hallway", occupancy: "binary_sensor.hallway_sensor_occupancy" },
-    living: { name: "Living Room", short_name: "Living", temperature: "sensor.temperature_living_room_temperature", humidity: "sensor.temperature_living_room_humidity", light: "light.livingroom_lights", climate: "climate.virtual_thermostat_living_room", window: "binary_sensor.living_room_window" },
+    attic_left: { name: "Attic bedroom", short_name: "Attic" },
+    attic_right: { name: "Gym", short_name: "Gym" },
+    first_1: { name: "Bedroom 1", short_name: "Bedroom 1" },
+    first_2: { name: "Office", short_name: "Office" },
+    first_3: { name: "Main bedroom", short_name: "Bedroom" },
+    first_4: { name: "Bathroom", short_name: "Bath" },
+    ground_left: { name: "Hallway", short_name: "Hall" },
+    ground_right: { name: "Living room", short_name: "Living" },
   },
 };
 
@@ -131,7 +132,11 @@ function rcNormalize(config) {
 
   const rooms = config.rooms || {};
   if (typeof rooms !== "object" || Array.isArray(rooms)) throw new Error("rooms must be a mapping");
-  rcCheckKeys(rooms, new Set(RC_SLOTS), "rooms");
+  for (const k of Object.keys(rooms)) {
+    if (!RC_SLOTS.includes(k)) {
+      throw new Error(`rooms: unknown room key '${k}'. Since v0.4 the keys name the place in the drawing; valid keys are ${RC_SLOTS.join(", ")} (see the README)`);
+    }
+  }
   for (const slot of RC_SLOTS) {
     const def = RC_DEFAULTS.rooms[slot];
     const raw = rooms[slot] || {};
@@ -182,14 +187,14 @@ const rcScene = (v) => `<defs>
 <polygon points="4,320 302,320 366,300 40,300" fill="#000" opacity=".35"></polygon>
 <polygon points="300.0,104.0 360.0,84.0 360.0,293.0 300.0,313.0" fill="#b97c6e" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon>
 <g><line x1="300.0" y1="110.0" x2="360.0" y2="90.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="115.0" x2="360.0" y2="95.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="120.0" x2="360.0" y2="100.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="125.0" x2="360.0" y2="105.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="130.0" x2="360.0" y2="110.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="135.0" x2="360.0" y2="115.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="140.0" x2="360.0" y2="120.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="145.0" x2="360.0" y2="125.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="150.0" x2="360.0" y2="130.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="155.0" x2="360.0" y2="135.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="160.0" x2="360.0" y2="140.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="165.0" x2="360.0" y2="145.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="170.0" x2="360.0" y2="150.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="175.0" x2="360.0" y2="155.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="180.0" x2="360.0" y2="160.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="185.0" x2="360.0" y2="165.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="190.0" x2="360.0" y2="170.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="195.0" x2="360.0" y2="175.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="200.0" x2="360.0" y2="180.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="205.0" x2="360.0" y2="185.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="210.0" x2="360.0" y2="190.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="215.0" x2="360.0" y2="195.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="220.0" x2="360.0" y2="200.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="225.0" x2="360.0" y2="205.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="230.0" x2="360.0" y2="210.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="235.0" x2="360.0" y2="215.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="240.0" x2="360.0" y2="220.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="245.0" x2="360.0" y2="225.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="250.0" x2="360.0" y2="230.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="255.0" x2="360.0" y2="235.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="260.0" x2="360.0" y2="240.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="265.0" x2="360.0" y2="245.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="270.0" x2="360.0" y2="250.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="275.0" x2="360.0" y2="255.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="280.0" x2="360.0" y2="260.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="285.0" x2="360.0" y2="265.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="290.0" x2="360.0" y2="270.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="295.0" x2="360.0" y2="275.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="300.0" x2="360.0" y2="280.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="305.0" x2="360.0" y2="285.0" stroke="#8f5a4f" stroke-width="0.45"></line><line x1="300.0" y1="310.0" x2="360.0" y2="290.0" stroke="#8f5a4f" stroke-width="0.45"></line></g>
-<polygon points="308.0,125.3 324.0,120.0 324.0,172.0 308.0,177.3" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon><polygon points="309.6,127.8 322.4,123.5 322.4,169.5 309.6,173.8" fill="${v.sideGlass.master}" stroke="#111" stroke-width=".8"></polygon><line x1="316.0" y1="125.7" x2="316.0" y2="171.7" stroke="#f4f2ee" stroke-width="2"></line><line x1="316.0" y1="125.7" x2="316.0" y2="171.7" stroke="#111" stroke-width="0.5"></line><polygon points="307.0,177.7 325.0,171.7 325.0,174.7 307.0,180.7" fill="#f4f2ee" stroke="#111" stroke-width="1"></polygon>
-<polygon points="336.0,116.0 352.0,110.7 352.0,162.7 336.0,168.0" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon><polygon points="337.6,118.5 350.4,114.2 350.4,160.2 337.6,164.5" fill="${v.sideGlass.bath}" stroke="#111" stroke-width=".8"></polygon><line x1="344.0" y1="116.3" x2="344.0" y2="162.3" stroke="#f4f2ee" stroke-width="2"></line><line x1="344.0" y1="116.3" x2="344.0" y2="162.3" stroke="#111" stroke-width="0.5"></line><polygon points="335.0,168.3 353.0,162.3 353.0,165.3 335.0,171.3" fill="#f4f2ee" stroke="#111" stroke-width="1"></polygon>
+<polygon points="308.0,125.3 324.0,120.0 324.0,172.0 308.0,177.3" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon><polygon points="309.6,127.8 322.4,123.5 322.4,169.5 309.6,173.8" fill="${v.sideGlass.first_3}" stroke="#111" stroke-width=".8"></polygon><line x1="316.0" y1="125.7" x2="316.0" y2="171.7" stroke="#f4f2ee" stroke-width="2"></line><line x1="316.0" y1="125.7" x2="316.0" y2="171.7" stroke="#111" stroke-width="0.5"></line><polygon points="307.0,177.7 325.0,171.7 325.0,174.7 307.0,180.7" fill="#f4f2ee" stroke="#111" stroke-width="1"></polygon>
+<polygon points="336.0,116.0 352.0,110.7 352.0,162.7 336.0,168.0" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon><polygon points="337.6,118.5 350.4,114.2 350.4,160.2 337.6,164.5" fill="${v.sideGlass.first_4}" stroke="#111" stroke-width=".8"></polygon><line x1="344.0" y1="116.3" x2="344.0" y2="162.3" stroke="#f4f2ee" stroke-width="2"></line><line x1="344.0" y1="116.3" x2="344.0" y2="162.3" stroke="#111" stroke-width="0.5"></line><polygon points="335.0,168.3 353.0,162.3 353.0,165.3 335.0,171.3" fill="#f4f2ee" stroke="#111" stroke-width="1"></polygon>
 <polygon points="300.0,210.0 360.0,190.0 360.0,208.0 300.0,228.0" fill="#f4f2ee" stroke="#111" stroke-width="1"></polygon>
 <polygon points="301.0,212.7 359.0,193.3 359.0,201.3 301.0,220.7" fill="#fbfaf7" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon>
 <line x1="302.0" y1="221.8" x2="358.0" y2="203.2" stroke="${v.hemColor}" stroke-width="1.6"></line>
 <polygon points="302.0,228.3 326.0,220.3 326.0,303.3 302.0,311.3" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon>
-<polygon points="303.0,229.0 314.0,225.3 314.0,307.3 303.0,311.0" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon><polygon points="304.6,231.5 312.4,228.9 312.4,281.9 304.6,284.5" fill="${v.sideGlass.living}" stroke="#111" stroke-width=".8"></polygon><polygon points="304.6,288.5 312.4,285.9 312.4,304.9 304.6,307.5" fill="#fbfaf7" stroke="#111" stroke-width=".8"></polygon>
-<polygon points="314.0,225.3 325.0,221.7 325.0,303.7 314.0,307.3" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon><polygon points="315.6,227.8 323.4,225.2 323.4,278.2 315.6,280.8" fill="${v.sideGlass.living}" stroke="#111" stroke-width=".8"></polygon><polygon points="315.6,284.8 323.4,282.2 323.4,301.2 315.6,303.8" fill="#fbfaf7" stroke="#111" stroke-width=".8"></polygon>
+<polygon points="303.0,229.0 314.0,225.3 314.0,307.3 303.0,311.0" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon><polygon points="304.6,231.5 312.4,228.9 312.4,281.9 304.6,284.5" fill="${v.sideGlass.ground_right}" stroke="#111" stroke-width=".8"></polygon><polygon points="304.6,288.5 312.4,285.9 312.4,304.9 304.6,307.5" fill="#fbfaf7" stroke="#111" stroke-width=".8"></polygon>
+<polygon points="314.0,225.3 325.0,221.7 325.0,303.7 314.0,307.3" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon><polygon points="315.6,227.8 323.4,225.2 323.4,278.2 315.6,280.8" fill="${v.sideGlass.ground_right}" stroke="#111" stroke-width=".8"></polygon><polygon points="315.6,284.8 323.4,282.2 323.4,301.2 315.6,303.8" fill="#fbfaf7" stroke="#111" stroke-width=".8"></polygon>
 <line x1="312.6" y1="257.8" x2="312.6" y2="265.8" stroke="#333" stroke-width="1.2"></line><line x1="315.4" y1="256.9" x2="315.4" y2="264.9" stroke="#333" stroke-width="1.2"></line>
 <g class="hit ${v.cls.lantern}" data-act="lantern" role="button" tabindex="0" aria-label="Garden lantern"><circle cx="331.0" cy="239.7" r="13" fill="transparent"></circle><line x1="331.0" y1="229.7" x2="331.0" y2="233.7" stroke="#111" stroke-width="1.6"></line><polygon points="327.5,234.8 334.5,232.5 331.0,230.2" fill="#111"></polygon><polygon points="328.0,234.7 334.0,232.7 334.0,244.7 328.0,246.7" fill="${v.lanternGlass}" stroke="#111" stroke-width="1.6"></polygon><polygon points="327.5,246.8 334.5,244.5 334.5,246.5 327.5,248.8" fill="#111" ></polygon></g>
 <polygon points="337.0,216.7 349.0,212.7 349.0,295.7 337.0,299.7" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon>
@@ -201,9 +206,9 @@ const rcScene = (v) => `<defs>
 <rect x="174" y="2" width="12.3" height="22" fill="#b97c6e" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></rect><rect x="171.5" y="-2" width="17.5" height="5" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></rect>
 <polygon points="309,110 159,6 219,-14 369,90" fill="#3a3331" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></polygon>
 <g transform="matrix(0.876 0 0 1 2.232 0)">
-<g class="room ${v.cls.sport}" data-act="sport" role="button" tabindex="0" aria-label="${v.aria.sport}"><polygon points="181,19 222,42 308,42 308,104 181,104" fill="${v.fill.sport}"></polygon><g fill="none" stroke="${v.ink.sport}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="252" cy="92" r="11"></circle><circle cx="284" cy="92" r="11"></circle><path d="M252 92l10-15h14l8 15M262 77l7 15h15M276 77l-1-5h-5M258 72h9"></path></g><text transform="matrix(1.1416 0 0 1 -26.753 0)" x="189" y="64" font-size="11" fill="${v.txt2.sport}">${v.label.sport}</text><text transform="matrix(1.1416 0 0 1 -26.753 0)" x="189" y="82" font-size="16" font-weight="500" fill="${v.txt.sport}" style="font-variant-numeric: tabular-nums">${v.temp.sport}</text></g>
-<g class="room ${v.cls.tim}" data-act="tim" role="button" tabindex="0" aria-label="${v.aria.tim}"><polygon points="50,104 50,42 136,42 177,19 177,104" fill="${v.fill.tim}"></polygon><g fill="${v.ink.tim}"><rect x="56" y="66" width="6" height="38" rx="1.5"></rect><rect x="60" y="80" width="46" height="12" rx="3"></rect><rect x="64" y="92" width="4" height="12"></rect><rect x="99" y="92" width="4" height="12"></rect><rect x="65" y="73" width="15" height="7" rx="3.5"></rect></g><text transform="matrix(1.1416 0 0 1 -15.854 0)" x="112" y="64" font-size="11" fill="${v.txt2.tim}">${v.label.tim}</text><text transform="matrix(1.1416 0 0 1 -15.854 0)" x="112" y="82" font-size="16" font-weight="500" fill="${v.txt.tim}" style="font-variant-numeric: tabular-nums">${v.temp.tim}</text></g>
-<g class="hit ${v.cls.timSpot}" data-act="timSpot" role="button" tabindex="0" aria-label="Tim bed light"><circle cx="72" cy="68" r="16" fill="transparent"></circle><path d="M62 59h10v4" fill="none" stroke="#111" stroke-width="1.8"></path><path d="M65.5 72l2.5-9h8l2.5 9z" fill="${v.spotColor.tim}" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></path><path d="M65.5 72h13" stroke="#111" stroke-width="1.4"></path></g>
+<g class="room ${v.cls.attic_right}" data-act="attic_right" role="button" tabindex="0" aria-label="${v.aria.attic_right}"><polygon points="181,19 222,42 308,42 308,104 181,104" fill="${v.fill.attic_right}"></polygon><g fill="none" stroke="${v.ink.attic_right}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="252" cy="92" r="11"></circle><circle cx="284" cy="92" r="11"></circle><path d="M252 92l10-15h14l8 15M262 77l7 15h15M276 77l-1-5h-5M258 72h9"></path></g><text transform="matrix(1.1416 0 0 1 -26.753 0)" x="189" y="64" font-size="11" fill="${v.txt2.attic_right}">${v.label.attic_right}</text><text transform="matrix(1.1416 0 0 1 -26.753 0)" x="189" y="82" font-size="16" font-weight="500" fill="${v.txt.attic_right}" style="font-variant-numeric: tabular-nums">${v.temp.attic_right}</text></g>
+<g class="room ${v.cls.attic_left}" data-act="attic_left" role="button" tabindex="0" aria-label="${v.aria.attic_left}"><polygon points="50,104 50,42 136,42 177,19 177,104" fill="${v.fill.attic_left}"></polygon><g fill="${v.ink.attic_left}"><rect x="56" y="66" width="6" height="38" rx="1.5"></rect><rect x="60" y="80" width="46" height="12" rx="3"></rect><rect x="64" y="92" width="4" height="12"></rect><rect x="99" y="92" width="4" height="12"></rect><rect x="65" y="73" width="15" height="7" rx="3.5"></rect></g><text transform="matrix(1.1416 0 0 1 -15.854 0)" x="112" y="64" font-size="11" fill="${v.txt2.attic_left}">${v.label.attic_left}</text><text transform="matrix(1.1416 0 0 1 -15.854 0)" x="112" y="82" font-size="16" font-weight="500" fill="${v.txt.attic_left}" style="font-variant-numeric: tabular-nums">${v.temp.attic_left}</text></g>
+<g class="hit ${v.cls.bed_attic_left}" data-act="bed_attic_left" role="button" tabindex="0" aria-label="Bed light"><circle cx="72" cy="68" r="16" fill="transparent"></circle><path d="M62 59h10v4" fill="none" stroke="#111" stroke-width="1.8"></path><path d="M65.5 72l2.5-9h8l2.5 9z" fill="${v.spotColor.attic_left}" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></path><path d="M65.5 72h13" stroke="#111" stroke-width="1.4"></path></g>
 <rect x="177" y="18" width="4" height="86" fill="#f4f2ee" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></rect>
 <polygon points="131,35 179,6 227,35 222,42 179,18 136,42" fill="#4a403c" stroke="#111" stroke-width="2.2" stroke-linejoin="round"></polygon>
 <polygon points="8,110 43,89 50,89 50,104 25,104" fill="#4a403c" stroke="#111" stroke-width="2.2" stroke-linejoin="round"></polygon>
@@ -218,25 +223,25 @@ const rcScene = (v) => `<defs>
 <rect x="221" y="35" width="101" height="7" fill="#4a403c" stroke="#111" stroke-width="2" stroke-linejoin="round"></rect>
 <rect x="221" y="33" width="101" height="3" fill="#f4f2ee" stroke="#111" stroke-width="1"></rect>
 <rect x="18" y="104" width="322" height="6" fill="#f4f2ee" stroke="#111" stroke-width="1.6"></rect>
-<g class="room ${v.cls.gijs}" data-act="gijs" role="button" tabindex="0" aria-label="${v.aria.gijs}"><rect x="25" y="110" width="72" height="96" fill="${v.fill.gijs}"></rect><g fill="${v.ink.gijs}"><rect x="29" y="168" width="6" height="38" rx="1.5"></rect><rect x="33" y="182" width="60" height="12" rx="3"></rect><rect x="35" y="194" width="4" height="12"></rect><rect x="85" y="194" width="4" height="12"></rect><rect x="37" y="175" width="15" height="7" rx="3.5"></rect></g><text transform="matrix(1.1416 0 0 1 -4.671 0)" x="33" y="128" font-size="11" fill="${v.txt2.gijs}">${v.label.gijs}</text><text transform="matrix(1.1416 0 0 1 -4.671 0)" x="33" y="146" font-size="16" font-weight="500" fill="${v.txt.gijs}" style="font-variant-numeric: tabular-nums">${v.temp.gijs}</text></g>
-<g class="hit ${v.cls.gijsSpot}" data-act="gijsSpot" role="button" tabindex="0" aria-label="Gijs bed light"><circle cx="45" cy="166" r="16" fill="transparent"></circle><path d="M35 157h10v4" fill="none" stroke="#111" stroke-width="1.8"></path><path d="M38.5 170l2.5-9h8l2.5 9z" fill="${v.spotColor.gijs}" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></path><path d="M38.5 170h13" stroke="#111" stroke-width="1.4"></path></g>
+<g class="room ${v.cls.first_1}" data-act="first_1" role="button" tabindex="0" aria-label="${v.aria.first_1}"><rect x="25" y="110" width="72" height="96" fill="${v.fill.first_1}"></rect><g fill="${v.ink.first_1}"><rect x="29" y="168" width="6" height="38" rx="1.5"></rect><rect x="33" y="182" width="60" height="12" rx="3"></rect><rect x="35" y="194" width="4" height="12"></rect><rect x="85" y="194" width="4" height="12"></rect><rect x="37" y="175" width="15" height="7" rx="3.5"></rect></g><text transform="matrix(1.1416 0 0 1 -4.671 0)" x="33" y="128" font-size="11" fill="${v.txt2.first_1}">${v.label.first_1}</text><text transform="matrix(1.1416 0 0 1 -4.671 0)" x="33" y="146" font-size="16" font-weight="500" fill="${v.txt.first_1}" style="font-variant-numeric: tabular-nums">${v.temp.first_1}</text></g>
+<g class="hit ${v.cls.bed_first_1}" data-act="bed_first_1" role="button" tabindex="0" aria-label="Bed light"><circle cx="45" cy="166" r="16" fill="transparent"></circle><path d="M35 157h10v4" fill="none" stroke="#111" stroke-width="1.8"></path><path d="M38.5 170l2.5-9h8l2.5 9z" fill="${v.spotColor.first_1}" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></path><path d="M38.5 170h13" stroke="#111" stroke-width="1.4"></path></g>
 <rect x="97" y="110" width="3" height="96" fill="#f4f2ee" stroke="#111" stroke-width="1"></rect>
-<g class="room ${v.cls.office}" data-act="office" role="button" tabindex="0" aria-label="${v.aria.office}"><rect x="100" y="110" width="75" height="96" fill="${v.fill.office}"></rect><path d="M157 110v4" stroke="${v.ink.office}" stroke-width="1"></path><path d="M149 121l8-7 8 7z" fill="${v.ink.office}"></path><g fill="${v.ink.office}"><rect x="123" y="176" width="48" height="3" rx="1"></rect><rect x="126" y="179" width="3" height="27"></rect><rect x="165" y="179" width="3" height="27"></rect><rect x="136" y="158" width="24" height="15" rx="2"></rect><rect x="146" y="173" width="4" height="3"></rect></g><path d="M107 206v-16h10M114 190v-14" fill="none" stroke="${v.ink.office}" stroke-width="2.4" stroke-linecap="round"></path><text transform="matrix(1.1416 0 0 1 -15.288 0)" x="108" y="128" font-size="11" fill="${v.txt2.office}">${v.label.office}</text><text transform="matrix(1.1416 0 0 1 -15.288 0)" x="108" y="146" font-size="16" font-weight="500" fill="${v.txt.office}" style="font-variant-numeric: tabular-nums">${v.temp.office}</text></g>
+<g class="room ${v.cls.first_2}" data-act="first_2" role="button" tabindex="0" aria-label="${v.aria.first_2}"><rect x="100" y="110" width="75" height="96" fill="${v.fill.first_2}"></rect><path d="M157 110v4" stroke="${v.ink.first_2}" stroke-width="1"></path><path d="M149 121l8-7 8 7z" fill="${v.ink.first_2}"></path><g fill="${v.ink.first_2}"><rect x="123" y="176" width="48" height="3" rx="1"></rect><rect x="126" y="179" width="3" height="27"></rect><rect x="165" y="179" width="3" height="27"></rect><rect x="136" y="158" width="24" height="15" rx="2"></rect><rect x="146" y="173" width="4" height="3"></rect></g><path d="M107 206v-16h10M114 190v-14" fill="none" stroke="${v.ink.first_2}" stroke-width="2.4" stroke-linecap="round"></path><text transform="matrix(1.1416 0 0 1 -15.288 0)" x="108" y="128" font-size="11" fill="${v.txt2.first_2}">${v.label.first_2}</text><text transform="matrix(1.1416 0 0 1 -15.288 0)" x="108" y="146" font-size="16" font-weight="500" fill="${v.txt.first_2}" style="font-variant-numeric: tabular-nums">${v.temp.first_2}</text></g>
 <rect x="175" y="110" width="3" height="96" fill="#f4f2ee" stroke="#111" stroke-width="1"></rect>
-<g class="room ${v.cls.master}" data-act="master" role="button" tabindex="0" aria-label="${v.aria.master}"><rect x="178" y="110" width="80" height="96" fill="${v.fill.master}"></rect><g fill="${v.ink.master}"><rect x="182" y="162" width="6" height="44" rx="1.5"></rect><rect x="186" y="182" width="70" height="12" rx="3"></rect><rect x="188" y="194" width="4" height="12"></rect><rect x="248" y="194" width="4" height="12"></rect><rect x="190" y="175" width="15" height="7" rx="3.5"></rect><rect x="207" y="175" width="15" height="7" rx="3.5"></rect></g><text transform="matrix(1.1416 0 0 1 -26.329 0)" x="186" y="128" font-size="11" fill="${v.txt2.master}">${v.label.master}</text><text transform="matrix(1.1416 0 0 1 -26.329 0)" x="186" y="146" font-size="16" font-weight="500" fill="${v.txt.master}" style="font-variant-numeric: tabular-nums">${v.temp.master}</text></g>
-<g class="hit ${v.cls.masterFan}" data-act="masterFan" role="button" tabindex="0" aria-label="Ceiling fan"><circle cx="246" cy="132" r="16" fill="transparent"></circle><path d="M246 110v12" stroke="#111" stroke-width="1.4"></path><g class="${v.spin.masterFan}"><ellipse cx="246" cy="124" rx="2.2" ry="9" fill="${v.fanColor.masterFan}" stroke="#111" stroke-width=".8" transform="rotate(0 246 133)"></ellipse><ellipse cx="246" cy="124" rx="2.2" ry="9" fill="${v.fanColor.masterFan}" stroke="#111" stroke-width=".8" transform="rotate(120 246 133)"></ellipse><ellipse cx="246" cy="124" rx="2.2" ry="9" fill="${v.fanColor.masterFan}" stroke="#111" stroke-width=".8" transform="rotate(240 246 133)"></ellipse><circle cx="246" cy="133" r="3" fill="#f4f2ee" stroke="#111" stroke-width="1"></circle></g></g>
+<g class="room ${v.cls.first_3}" data-act="first_3" role="button" tabindex="0" aria-label="${v.aria.first_3}"><rect x="178" y="110" width="80" height="96" fill="${v.fill.first_3}"></rect><g fill="${v.ink.first_3}"><rect x="182" y="162" width="6" height="44" rx="1.5"></rect><rect x="186" y="182" width="70" height="12" rx="3"></rect><rect x="188" y="194" width="4" height="12"></rect><rect x="248" y="194" width="4" height="12"></rect><rect x="190" y="175" width="15" height="7" rx="3.5"></rect><rect x="207" y="175" width="15" height="7" rx="3.5"></rect></g><text transform="matrix(1.1416 0 0 1 -26.329 0)" x="186" y="128" font-size="11" fill="${v.txt2.first_3}">${v.label.first_3}</text><text transform="matrix(1.1416 0 0 1 -26.329 0)" x="186" y="146" font-size="16" font-weight="500" fill="${v.txt.first_3}" style="font-variant-numeric: tabular-nums">${v.temp.first_3}</text></g>
+<g class="hit ${v.cls.fan_first_3}" data-act="fan_first_3" role="button" tabindex="0" aria-label="Ceiling fan"><circle cx="246" cy="132" r="16" fill="transparent"></circle><path d="M246 110v12" stroke="#111" stroke-width="1.4"></path><g class="${v.spin.fan_first_3}"><ellipse cx="246" cy="124" rx="2.2" ry="9" fill="${v.fanColor.fan_first_3}" stroke="#111" stroke-width=".8" transform="rotate(0 246 133)"></ellipse><ellipse cx="246" cy="124" rx="2.2" ry="9" fill="${v.fanColor.fan_first_3}" stroke="#111" stroke-width=".8" transform="rotate(120 246 133)"></ellipse><ellipse cx="246" cy="124" rx="2.2" ry="9" fill="${v.fanColor.fan_first_3}" stroke="#111" stroke-width=".8" transform="rotate(240 246 133)"></ellipse><circle cx="246" cy="133" r="3" fill="#f4f2ee" stroke="#111" stroke-width="1"></circle></g></g>
 <rect x="258" y="110" width="3" height="96" fill="#f4f2ee" stroke="#111" stroke-width="1"></rect>
-<g class="room ${v.cls.bath}" data-act="bath" role="button" tabindex="0" aria-label="${v.aria.bath}"><rect x="261" y="110" width="72" height="96" fill="${v.fill.bath}"></rect><g fill="none" stroke="${v.ink.bath}"><path d="M325 204V161h-9" stroke-width="2"></path><path d="M318 161h-12l1.5 4h9z" fill="${v.ink.bath}" stroke-width=".6"></path><rect x="300" y="153" width="30" height="51" rx="1" stroke-width="1.6" fill="#ffffff" fill-opacity=".14"></rect><path d="M300 200h30" stroke-width="3"></path></g><g fill="none" stroke="${v.steamColor}" stroke-width="1.6" stroke-linecap="round" opacity="${v.o.steam}"><path class="steam" d="M306 192c-4-5 4-8 0-13s4-8 0-12"></path><path class="steam b" d="M317 192c-4-5 4-8 0-13s4-8 0-12"></path></g><text transform="matrix(1.1416 0 0 1 -37.795 0)" x="267" y="128" font-size="11" fill="${v.txt2.bath}">${v.label.bath}</text><text transform="matrix(1.1416 0 0 1 -37.795 0)" x="267" y="146" font-size="16" font-weight="500" fill="${v.txt.bath}" style="font-variant-numeric: tabular-nums">${v.temp.bath}</text><g opacity="${v.o.steam}"><text transform="matrix(1.1416 0 0 1 -37.795 0)" x="267" y="164" font-size="11" font-weight="500" fill="${v.humColor}">${v.humText}</text></g></g>
+<g class="room ${v.cls.first_4}" data-act="first_4" role="button" tabindex="0" aria-label="${v.aria.first_4}"><rect x="261" y="110" width="72" height="96" fill="${v.fill.first_4}"></rect><g fill="none" stroke="${v.ink.first_4}"><path d="M325 204V161h-9" stroke-width="2"></path><path d="M318 161h-12l1.5 4h9z" fill="${v.ink.first_4}" stroke-width=".6"></path><rect x="300" y="153" width="30" height="51" rx="1" stroke-width="1.6" fill="#ffffff" fill-opacity=".14"></rect><path d="M300 200h30" stroke-width="3"></path></g><g fill="none" stroke="${v.steamColor}" stroke-width="1.6" stroke-linecap="round" opacity="${v.o.steam}"><path class="steam" d="M306 192c-4-5 4-8 0-13s4-8 0-12"></path><path class="steam b" d="M317 192c-4-5 4-8 0-13s4-8 0-12"></path></g><text transform="matrix(1.1416 0 0 1 -37.795 0)" x="267" y="128" font-size="11" fill="${v.txt2.first_4}">${v.label.first_4}</text><text transform="matrix(1.1416 0 0 1 -37.795 0)" x="267" y="146" font-size="16" font-weight="500" fill="${v.txt.first_4}" style="font-variant-numeric: tabular-nums">${v.temp.first_4}</text><g opacity="${v.o.steam}"><text transform="matrix(1.1416 0 0 1 -37.795 0)" x="267" y="164" font-size="11" font-weight="500" fill="${v.humColor}">${v.humText}</text></g></g>
 <g class="hit ${v.cls.shower}" data-act="shower" role="button" tabindex="0" aria-label="Shower"><rect x="298" y="152" width="34" height="52" fill="transparent"></rect><g opacity="${v.o.shower}" stroke="${v.waterColor}" stroke-width="1.3" stroke-linecap="round"><path class="water" d="M308 166v33"></path><path class="water b" d="M311 166v33"></path><path class="water" d="M314 166v33"></path><path class="water b" d="M317 166v33"></path></g></g>
-<g class="hit ${v.cls.bathFan}" data-act="bathFan" role="button" tabindex="0" aria-label="Ceiling extractor fan"><circle cx="316" cy="120" r="15" fill="transparent"></circle><rect x="306" y="110" width="20" height="6" rx="1" fill="${v.fanColor.bathFan}" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></rect><path d="M310 116v-4M314 116v-4M318 116v-4M322 116v-4" stroke="#111" stroke-width=".7"></path><g fill="none" stroke="${v.airColor}" stroke-width="1.5" stroke-linecap="round" opacity="${v.o.air}"><path class="air" d="M310 129c-2-3 2-5 0-8"></path><path class="air b" d="M316 130c-2-3 2-5 0-8"></path><path class="air" d="M322 129c-2-3 2-5 0-8"></path></g></g>
+<g class="hit ${v.cls.fan_first_4}" data-act="fan_first_4" role="button" tabindex="0" aria-label="Ceiling extractor fan"><circle cx="316" cy="120" r="15" fill="transparent"></circle><rect x="306" y="110" width="20" height="6" rx="1" fill="${v.fanColor.fan_first_4}" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></rect><path d="M310 116v-4M314 116v-4M318 116v-4M322 116v-4" stroke="#111" stroke-width=".7"></path><g fill="none" stroke="${v.airColor}" stroke-width="1.5" stroke-linecap="round" opacity="${v.o.air}"><path class="air" d="M310 129c-2-3 2-5 0-8"></path><path class="air b" d="M316 130c-2-3 2-5 0-8"></path><path class="air" d="M322 129c-2-3 2-5 0-8"></path></g></g>
 <rect x="18" y="206" width="322" height="6" fill="#f4f2ee" stroke="#111" stroke-width="1.6"></rect>
-<g class="room ${v.cls.hall}" data-act="hall" role="button" tabindex="0" aria-label="${v.aria.hall}"><rect x="25" y="212" width="78" height="100" fill="${v.fill.hall}"></rect><path d="M84 212v6" stroke="${v.ink.hall}" stroke-width="1"></path><path d="M76 225l8-7 8 7z" fill="${v.ink.hall}"></path><path d="M103 212v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4" fill="none" stroke="${v.ink.hall}" stroke-width="2.6" stroke-linejoin="round"></path><path d="M36 262v40M31 268h10M31 276h10M32 302h8" stroke="${v.ink.hall}" stroke-width="2.2" stroke-linecap="round"></path><text transform="matrix(1.1416 0 0 1 -4.671 0)" x="33" y="230" font-size="11" fill="${v.txt2.hall}">${v.label.hall}</text><text transform="matrix(1.1416 0 0 1 -4.671 0)" x="33" y="248" font-size="16" font-weight="500" fill="${v.txt.hall}" style="font-variant-numeric: tabular-nums">${v.temp.hall}</text></g>
+<g class="room ${v.cls.ground_left}" data-act="ground_left" role="button" tabindex="0" aria-label="${v.aria.ground_left}"><rect x="25" y="212" width="78" height="100" fill="${v.fill.ground_left}"></rect><path d="M84 212v6" stroke="${v.ink.ground_left}" stroke-width="1"></path><path d="M76 225l8-7 8 7z" fill="${v.ink.ground_left}"></path><path d="M103 212v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4v10h-6.4" fill="none" stroke="${v.ink.ground_left}" stroke-width="2.6" stroke-linejoin="round"></path><path d="M36 262v40M31 268h10M31 276h10M32 302h8" stroke="${v.ink.ground_left}" stroke-width="2.2" stroke-linecap="round"></path><text transform="matrix(1.1416 0 0 1 -4.671 0)" x="33" y="230" font-size="11" fill="${v.txt2.ground_left}">${v.label.ground_left}</text><text transform="matrix(1.1416 0 0 1 -4.671 0)" x="33" y="248" font-size="16" font-weight="500" fill="${v.txt.ground_left}" style="font-variant-numeric: tabular-nums">${v.temp.ground_left}</text></g>
 <rect x="103" y="212" width="4" height="100" fill="#f4f2ee" stroke="#111" stroke-width="1"></rect>
-<g class="room ${v.cls.living}" data-act="living" role="button" tabindex="0" aria-label="${v.aria.living}"><rect x="107" y="212" width="226" height="100" fill="${v.fill.living}"></rect><g class="hit ${v.cls.kitchen}" data-act="kitchen" role="button" tabindex="0" aria-label="Kitchen light"><rect x="280" y="228" width="44" height="84" fill="#a9d8c6"></rect><path d="M280 236h44M280 244h44M280 252h44M280 260h44M280 268h44M280 276h44M288 228v50M296 228v50M304 228v50M312 228v50M320 228v50" stroke="#8fc3b0" stroke-width=".6"></path><rect x="280" y="232" width="44" height="14" fill="#fbfaf7" stroke="#111" stroke-width="1"></rect><path d="M302 232v14" stroke="#111" stroke-width=".8"></path><rect x="280" y="281" width="44" height="31" fill="#fbfaf7" stroke="#111" stroke-width="1"></rect><path d="M302 281v31M292 288h4M308 288h4" stroke="#111" stroke-width=".8"></path><rect x="279" y="277" width="46" height="4" fill="#111"></rect><rect x="280" y="228" width="44" height="84" fill="#ffc552" opacity="${v.o.kitchenWarm}"></rect><rect x="280" y="228" width="44" height="84" fill="#000" opacity="${v.o.kitchenDim}"></rect><path d="M280 312V228h44v84" fill="none" stroke="#111" stroke-width="1.6"></path></g><path d="M220 212v8" stroke="${v.ink.living}" stroke-width="1"></path><path d="M212 227l8-7 8 7z" fill="${v.ink.living}"></path><g fill="${v.ink.living}"><rect x="182" y="266" width="80" height="16" rx="4"></rect><rect x="176" y="276" width="92" height="20" rx="4"></rect><rect x="182" y="296" width="4" height="16"></rect><rect x="258" y="296" width="4" height="16"></rect><rect x="152" y="286" width="18" height="3"></rect><rect x="159" y="289" width="4" height="23"></rect><path d="M154 284l3-12h8l3 12z"></path></g><rect x="114" y="276" width="30" height="24" rx="2" fill="${v.radFill}" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></rect><path d="M119 279v18M124 279v18M129 279v18M134 279v18M139 279v18" stroke="#111" stroke-width=".8"></path><g class="heat" fill="none" stroke="#ff8a3d" stroke-width="1.6" stroke-linecap="round" opacity="${v.o.heat}"><path d="M121 271c-3-4 3-6 0-10"></path><path d="M129 271c-3-4 3-6 0-10"></path><path d="M137 271c-3-4 3-6 0-10"></path></g><text transform="matrix(1.1416 0 0 1 -16.279 0)" x="115" y="230" font-size="11" fill="${v.txt2.living}">${v.label.living}</text><text transform="matrix(1.1416 0 0 1 -16.279 0)" x="115" y="248" font-size="16" font-weight="500" fill="${v.txt.living}" style="font-variant-numeric: tabular-nums">${v.temp.living}</text></g>
+<g class="room ${v.cls.ground_right}" data-act="ground_right" role="button" tabindex="0" aria-label="${v.aria.ground_right}"><rect x="107" y="212" width="226" height="100" fill="${v.fill.ground_right}"></rect><g class="hit ${v.cls.kitchen}" data-act="kitchen" role="button" tabindex="0" aria-label="Kitchen light"><rect x="280" y="228" width="44" height="84" fill="#a9d8c6"></rect><path d="M280 236h44M280 244h44M280 252h44M280 260h44M280 268h44M280 276h44M288 228v50M296 228v50M304 228v50M312 228v50M320 228v50" stroke="#8fc3b0" stroke-width=".6"></path><rect x="280" y="232" width="44" height="14" fill="#fbfaf7" stroke="#111" stroke-width="1"></rect><path d="M302 232v14" stroke="#111" stroke-width=".8"></path><rect x="280" y="281" width="44" height="31" fill="#fbfaf7" stroke="#111" stroke-width="1"></rect><path d="M302 281v31M292 288h4M308 288h4" stroke="#111" stroke-width=".8"></path><rect x="279" y="277" width="46" height="4" fill="#111"></rect><rect x="280" y="228" width="44" height="84" fill="#ffc552" opacity="${v.o.kitchenWarm}"></rect><rect x="280" y="228" width="44" height="84" fill="#000" opacity="${v.o.kitchenDim}"></rect><path d="M280 312V228h44v84" fill="none" stroke="#111" stroke-width="1.6"></path></g><path d="M220 212v8" stroke="${v.ink.ground_right}" stroke-width="1"></path><path d="M212 227l8-7 8 7z" fill="${v.ink.ground_right}"></path><g fill="${v.ink.ground_right}"><rect x="182" y="266" width="80" height="16" rx="4"></rect><rect x="176" y="276" width="92" height="20" rx="4"></rect><rect x="182" y="296" width="4" height="16"></rect><rect x="258" y="296" width="4" height="16"></rect><rect x="152" y="286" width="18" height="3"></rect><rect x="159" y="289" width="4" height="23"></rect><path d="M154 284l3-12h8l3 12z"></path></g><rect x="114" y="276" width="30" height="24" rx="2" fill="${v.radFill}" stroke="#111" stroke-width="1.4" stroke-linejoin="round"></rect><path d="M119 279v18M124 279v18M129 279v18M134 279v18M139 279v18" stroke="#111" stroke-width=".8"></path><g class="heat" fill="none" stroke="#ff8a3d" stroke-width="1.6" stroke-linecap="round" opacity="${v.o.heat}"><path d="M121 271c-3-4 3-6 0-10"></path><path d="M129 271c-3-4 3-6 0-10"></path><path d="M137 271c-3-4 3-6 0-10"></path></g><text transform="matrix(1.1416 0 0 1 -16.279 0)" x="115" y="230" font-size="11" fill="${v.txt2.ground_right}">${v.label.ground_right}</text><text transform="matrix(1.1416 0 0 1 -16.279 0)" x="115" y="248" font-size="16" font-weight="500" fill="${v.txt.ground_right}" style="font-variant-numeric: tabular-nums">${v.temp.ground_right}</text></g>
 <rect x="18" y="104" width="7" height="208" fill="#f4f2ee" stroke="#111" stroke-width="1.8"></rect>
 <rect x="333" y="104" width="7" height="208" fill="#f4f2ee" stroke="#111" stroke-width="1.8"></rect>
-<rect x="334.5" y="131" width="4" height="48" fill="${v.sideGlass.master}" stroke="#111" stroke-width=".8"></rect>
-<rect x="334.5" y="231" width="4" height="58" fill="${v.sideGlass.living}" stroke="#111" stroke-width=".8"></rect>
+<rect x="334.5" y="131" width="4" height="48" fill="${v.sideGlass.first_3}" stroke="#111" stroke-width=".8"></rect>
+<rect x="334.5" y="231" width="4" height="58" fill="${v.sideGlass.ground_right}" stroke="#111" stroke-width=".8"></rect>
 <rect x="10" y="312" width="342" height="7" fill="#111"></rect>
 </g>`;
 
@@ -430,9 +435,9 @@ class RoomCard extends HTMLElement {
       return { entity: light, tap: light ? "toggle" : "details", hold: "details", slot: key };
     }
     const map = {
-      masterFan: c.rooms.master.fan, bathFan: c.rooms.bath.fan,
-      gijsSpot: c.rooms.gijs.bed_light, timSpot: c.rooms.tim.bed_light,
-      lantern: c.entities.lantern, kitchen: c.entities.kitchen_light, shower: c.rooms.bath.shower,
+      fan_first_3: c.rooms.first_3.fan, fan_first_4: c.rooms.first_4.fan,
+      bed_first_1: c.rooms.first_1.bed_light, bed_attic_left: c.rooms.attic_left.bed_light,
+      lantern: c.entities.lantern, kitchen: c.entities.kitchen_light, shower: c.rooms.first_4.shower,
     };
     const entity = map[key] || null;
     if (!entity) return { entity: null, tap: "none", hold: "none" };
@@ -503,8 +508,8 @@ class RoomCard extends HTMLElement {
   _actFor(id) {
     const c = this._config;
     for (const slot of RC_SLOTS) if (c.rooms[slot].light === id) return slot;
-    if (c.rooms.gijs.bed_light === id) return "gijsSpot";
-    if (c.rooms.tim.bed_light === id) return "timSpot";
+    if (c.rooms.first_1.bed_light === id) return "bed_first_1";
+    if (c.rooms.attic_left.bed_light === id) return "bed_attic_left";
     return null;
   }
 
@@ -531,7 +536,7 @@ class RoomCard extends HTMLElement {
   /* Room lights and bed lights: what "lights on" counts and All off switches off. */
   _lightIds() {
     const r = this._config.rooms;
-    return [...RC_SLOTS.map((s) => r[s].light), r.gijs.bed_light, r.tim.bed_light].filter(Boolean);
+    return [...RC_SLOTS.map((s) => r[s].light), r.first_1.bed_light, r.attic_left.bed_light].filter(Boolean);
   }
 
   /* ---- DOM, built once per config --------------------------------------- */
@@ -620,7 +625,7 @@ class RoomCard extends HTMLElement {
     if (this._open(c.entities.front_door)) warns.push("Front door open");
     if (this._open(c.entities.garden_door)) warns.push("Garden doors open");
     if (this._open(c.entities.kitchen_door)) warns.push("Kitchen door open");
-    if (this._open(R.living.window)) warns.push(`${R.living.short_name} window open`);
+    if (this._open(R.ground_right.window)) warns.push(`${R.ground_right.short_name} window open`);
     for (const slot of RC_SLOTS) {
       const id = R[slot].light;
       if (id && this._unavail(id)) notices.push(`${R[slot].short_name} light unavailable`);
@@ -657,11 +662,11 @@ class RoomCard extends HTMLElement {
   _statusLine() {
     const R = this._config.rooms;
     const parts = [];
-    const bath = R.bath;
-    if (this._on(bath.shower) || this._open(bath.shower)) parts.push("Shower running");
-    const hum = this._num(bath.humidity);
+    const first_4 = R.first_4;
+    if (this._on(first_4.shower) || this._open(first_4.shower)) parts.push("Shower running");
+    const hum = this._num(first_4.humidity);
     if (hum !== null && hum >= this._config.humidity_alert) {
-      parts.push(`${bath.short_name} ${Math.round(hum)} %${this._on(bath.fan) ? ", fan on" : ""}`);
+      parts.push(`${first_4.short_name} ${Math.round(hum)} %${this._on(first_4.fan) ? ", fan on" : ""}`);
     }
     const heating = RC_SLOTS.filter((s) => R[s].climate && this._heating(R[s].climate));
     if (heating.length === 1) {
@@ -700,40 +705,40 @@ class RoomCard extends HTMLElement {
       v.aria[slot] = rcEsc(`${r.name}${t !== null ? `, ${this._fmt(t)} degrees` : ""}${r.light ? `, light ${on ? "on" : "off"}` : ""}`);
       v.cls[slot] = [r.light && this._unavail(r.light) ? "unavail" : "", this._failed.has(slot) ? "failed" : ""].join(" ").trim();
     }
-    for (const key of ["masterFan", "bathFan", "gijsSpot", "timSpot", "lantern", "kitchen", "shower"]) {
+    for (const key of ["fan_first_3", "fan_first_4", "bed_first_1", "bed_attic_left", "lantern", "kitchen", "shower"]) {
       const a = this._act(key);
       v.cls[key] = [!a.entity ? "na" : "", a.entity && this._unavail(a.entity) ? "unavail" : "", this._failed.has(key) ? "failed" : ""].join(" ").trim();
     }
-    const masterFan = this._on(R.master.fan);
-    const bathFan = this._on(R.bath.fan);
-    v.fanColor.masterFan = masterFan ? "#81c784" : "#f4f2ee";
-    v.fanColor.bathFan = bathFan ? "#90caf9" : "#f4f2ee";
-    v.spin.masterFan = masterFan && !rcReduced() ? "spin" : "";
-    v.spotColor.gijs = this._on(R.gijs.bed_light) ? "#ffe082" : "#f4f2ee";
-    v.spotColor.tim = this._on(R.tim.bed_light) ? "#ffe082" : "#f4f2ee";
+    const fan_first_3 = this._on(R.first_3.fan);
+    const fan_first_4 = this._on(R.first_4.fan);
+    v.fanColor.fan_first_3 = fan_first_3 ? "#81c784" : "#f4f2ee";
+    v.fanColor.fan_first_4 = fan_first_4 ? "#90caf9" : "#f4f2ee";
+    v.spin.fan_first_3 = fan_first_3 && !rcReduced() ? "spin" : "";
+    v.spotColor.first_1 = this._on(R.first_1.bed_light) ? "#ffe082" : "#f4f2ee";
+    v.spotColor.attic_left = this._on(R.attic_left.bed_light) ? "#ffe082" : "#f4f2ee";
 
-    const hum = this._num(R.bath.humidity);
+    const hum = this._num(R.first_4.humidity);
     const humid = hum !== null && hum >= c.humidity_alert;
-    const shower = this._on(R.bath.shower) || this._open(R.bath.shower);
-    const bathLit = this._on(R.bath.light);
+    const shower = this._on(R.first_4.shower) || this._open(R.first_4.shower);
+    const bathLit = this._on(R.first_4.light);
     v.o.steam = humid || shower ? 1 : 0;
     v.o.shower = shower ? 1 : 0;
-    v.o.air = bathFan ? 1 : 0;
+    v.o.air = fan_first_4 ? 1 : 0;
     v.humText = humid ? `${Math.round(hum)} %` : "";
     v.humColor = bathLit ? "#0d47a1" : (night ? "#64b5f6" : "#1565c0");
     v.steamColor = bathLit ? "#ffffff" : "#9ec9f0";
     v.waterColor = bathLit ? "#1565c0" : "#90caf9";
     v.airColor = "#42a5f5";
 
-    const heat = !!R.living.climate && this._heating(R.living.climate);
+    const heat = !!R.ground_right.climate && this._heating(R.ground_right.climate);
     v.o.heat = heat ? 1 : 0;
     v.radFill = heat ? "#ffb27a" : "#f4f2ee";
 
     const glass = night ? "#14181c" : `url(#${u}-day)`;
     v.winGlass = glass;
-    v.sideGlass.master = night && this._on(R.master.light) ? "#ffc552" : glass;
-    v.sideGlass.living = night && this._on(R.living.light) ? "#ffc552" : glass;
-    v.sideGlass.bath = night ? (bathLit ? "#ffe7a8" : "#2c3237") : "#dfe4e7";
+    v.sideGlass.first_3 = night && this._on(R.first_3.light) ? "#ffc552" : glass;
+    v.sideGlass.ground_right = night && this._on(R.ground_right.light) ? "#ffc552" : glass;
+    v.sideGlass.first_4 = night ? (bathLit ? "#ffe7a8" : "#2c3237") : "#dfe4e7";
 
     const kitchenOn = this._on(c.entities.kitchen_light);
     v.o.kitchenDim = night ? (kitchenOn ? 0 : 0.8) : 0;
@@ -779,7 +784,7 @@ class RoomCard extends HTMLElement {
     const climate = [
       row("Temperature", r.temperature, val(r.temperature, (s) => `${this._fmt(rcNum(s.state))} ${unit(r.temperature, "°C")}`)),
       row("Humidity", r.humidity, val(r.humidity, (s) => `${Math.round(rcNum(s.state))} %`),
-        this._detail === "bath" && this._num(r.humidity) !== null && this._num(r.humidity) >= c.humidity_alert ? "blue" : ""),
+        this._detail === "first_4" && this._num(r.humidity) !== null && this._num(r.humidity) >= c.humidity_alert ? "blue" : ""),
       row("Thermostat", r.climate, val(r.climate, (s) => {
         const t = rcNum(s.attributes.temperature);
         if (s.state === "off") return "Off";
@@ -794,7 +799,7 @@ class RoomCard extends HTMLElement {
       row("Bed light", r.bed_light, onOff(r.bed_light), this._on(r.bed_light) ? "on" : ""),
       row("Shower", r.shower, val(r.shower, (s) => (s.state === "on" ? "Running" : "Off")), this._open(r.shower) ? "blue" : ""),
     ];
-    if (this._detail === "living") {
+    if (this._detail === "ground_right") {
       ctl.push(row("Kitchen light", c.entities.kitchen_light, onOff(c.entities.kitchen_light), this._on(c.entities.kitchen_light) ? "on" : ""));
       ctl.push(row("Garden lantern", c.entities.lantern, onOff(c.entities.lantern), this._on(c.entities.lantern) ? "on" : ""));
     }
@@ -804,8 +809,8 @@ class RoomCard extends HTMLElement {
       row("Window", r.window, openClosed(r.window), this._open(r.window) ? "warn" : ""),
       row("Motion", r.occupancy, val(r.occupancy, (s) => (s.state === "on" ? "Detected" : "Clear"))),
     ];
-    if (this._detail === "hall") sens.push(row("Front door", c.entities.front_door, openClosed(c.entities.front_door), this._open(c.entities.front_door) ? "warn" : ""));
-    if (this._detail === "living") {
+    if (this._detail === "ground_left") sens.push(row("Front door", c.entities.front_door, openClosed(c.entities.front_door), this._open(c.entities.front_door) ? "warn" : ""));
+    if (this._detail === "ground_right") {
       sens.push(row("Garden doors", c.entities.garden_door, openClosed(c.entities.garden_door), this._open(c.entities.garden_door) ? "warn" : ""));
       sens.push(row("Kitchen door", c.entities.kitchen_door, openClosed(c.entities.kitchen_door), this._open(c.entities.kitchen_door) ? "warn" : ""));
     }
@@ -834,7 +839,7 @@ const RC_ROLE_DOMAINS = {
   front_door: ["binary_sensor"], garden_door: ["binary_sensor"], kitchen_door: ["binary_sensor"],
 };
 const rcEntitySel = (role) => ({ entity: RC_ROLE_DOMAINS[role] ? { filter: { domain: RC_ROLE_DOMAINS[role] } } : {} });
-const RC_ROOM_ICONS = { tim: "mdi:bed", sport: "mdi:bike-fast", gijs: "mdi:bed", office: "mdi:desk", master: "mdi:bed-king", bath: "mdi:shower", hall: "mdi:coat-rack", living: "mdi:sofa" };
+const RC_ROOM_ICONS = { attic_left: "mdi:bed", attic_right: "mdi:bike-fast", first_1: "mdi:bed", first_2: "mdi:desk", first_3: "mdi:bed-king", first_4: "mdi:shower", ground_left: "mdi:coat-rack", ground_right: "mdi:sofa" };
 
 const RC_EDITOR_SCHEMA = [
   { name: "name", selector: { text: {} } },
