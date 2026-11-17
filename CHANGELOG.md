@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.1
+
+### Changed
+* The dakkapellen are drawn in perspective: their flat roofs run back along the roof like the garden side, and the right one shows its side with a window.
+* No sun or moon in the sky. Night and day still show in the rooms (black glass or silver).
+
 ## v0.4.0
 
 ### Breaking
