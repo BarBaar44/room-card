@@ -21,7 +21,7 @@ The drawing is the owner's house: an attic with a dakkapel on both sides (two ro
 | Living room | Radiator that glows with heat waves while its thermostat is heating; open passage to the kitchen |
 | Kitchen | Lit by day; at night dark, or warm while `kitchen_light` is on. Its door and window on the garden side follow the same |
 | Garden side | The facade from the Gardenview House card: sun screen cassette, French doors, brick pier with the lantern, kitchen door and window. At night the French doors and the `first_3` window glow while that room's light is on; the bathroom window is frosted and glows pale |
-| Sky | Moon at night, sun by day. Dark: the `dark` entity (on/off, or an illuminance sensor below `dark_below`), else the sun below the horizon |
+| Night and day | Dark: the `dark` entity (on/off, or an illuminance sensor below `dark_below`), else the sun below the horizon |
 
 ## Using it
 
